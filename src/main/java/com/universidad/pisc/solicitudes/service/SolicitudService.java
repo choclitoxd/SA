@@ -7,7 +7,6 @@ import com.universidad.pisc.identidad.model.Usuario;
 import com.universidad.pisc.identidad.repository.UsuarioRepository;
 import com.universidad.pisc.solicitudes.dto.*;
 import com.universidad.pisc.solicitudes.model.*;
-import com.universidad.pisc.solicitudes.repository.AsignacionRepository;
 import com.universidad.pisc.solicitudes.repository.HistorialSolicitudRepository;
 import com.universidad.pisc.solicitudes.repository.SolicitudAcademicaRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -25,7 +24,6 @@ public class SolicitudService {
 
     private final SolicitudAcademicaRepository solicitudRepository;
     private final HistorialSolicitudRepository historialRepository;
-    private final AsignacionRepository asignacionRepository;
     private final UsuarioRepository usuarioRepository;
     private final TipoSolicitudRepository tipoSolicitudRepository;
     private final TriageService triageService;

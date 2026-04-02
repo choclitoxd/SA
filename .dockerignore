@@ -1,0 +1,8 @@
+target/
+.git/
+.idea/
+.vscode/
+*.puml
+*.yaml
+GEMINI.md
+README.md

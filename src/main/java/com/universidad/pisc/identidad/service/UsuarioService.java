@@ -4,7 +4,6 @@ import com.universidad.pisc.identidad.dto.ActualizarUsuarioRequest;
 import com.universidad.pisc.identidad.dto.CrearUsuarioRequest;
 import com.universidad.pisc.identidad.dto.UsuarioMapper;
 import com.universidad.pisc.identidad.dto.UsuarioResponse;
-import com.universidad.pisc.identidad.model.NombreRol;
 import com.universidad.pisc.identidad.model.Rol;
 import com.universidad.pisc.identidad.model.Usuario;
 import com.universidad.pisc.identidad.repository.RolRepository;
@@ -17,7 +16,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 

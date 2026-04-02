@@ -34,7 +34,7 @@ servers:
     description: Producción
   - url: https://api-staging.pisc.universidad.edu.co/v2
     description: Staging
-  - url: http://localhost:8080/v2
+  - url: http://localhost:8080/
     description: Desarrollo local
 
 tags:

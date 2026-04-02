@@ -19,7 +19,8 @@ The system automates the intake, classification (triage), assignment, and resolu
 *   **Framework:** Spring Boot 3.2.4 (Java 17)
 *   **Persistence:** Spring Data JPA with Hibernate (ORM)
 *   **Security:** Spring Security (Stateless/JWT-ready)
-*   **Database:** H2 Database (In-memory for development)
+*   **Database:** MySQL (Hosted on **Aiven**) / H2 (Optional for local dev)
+*   **Containerization:** Docker (Multi-stage build)
 *   **Business Logic:** Domain-Driven Design (DDD) with Aggregate Roots (`SolicitudAcademica`) and Value Objects (`Prioridad`).
 *   **Validation:** Jakarta Bean Validation (Hibernate Validator).
 *   **Documentation:** OpenAPI 3.0 (Swagger) specification included.
@@ -40,15 +41,26 @@ src/main/java/com/universidad/pisc/
 ### Prerequisites
 *   Java 17 (JDK)
 *   Maven 3.6+
+*   **Docker Desktop** (Recommended for deployment)
 
-### Execution
-1.  Clone the repository.
-2.  Configure your environment (default is H2 in-memory).
-3.  Run the application:
+### Execution with Docker (Recommended)
+1.  Build the image:
+    ```bash
+    docker build -t solicitudes-academicas .
+    ```
+2.  Run the container:
+    ```bash
+    docker run -p 8080:8080 --name app-pisc solicitudes-academicas
+    ```
+
+### Local Execution (Maven)
+1.  Configure `src/main/resources/application.properties` with your database credentials.
+2.  Run the application:
     ```bash
     mvn spring-boot:run
     ```
-4.  The API will be available at `http://localhost:8080/v2`.
+
+The API will be available at `http://localhost:8080/v2`.
 
 ## 📜 API Documentation
 
@@ -64,7 +76,8 @@ The project is currently in **Stage 5: Advanced Functionalities**.
 - [x] **Stage 1 & 2:** Foundational Models and Data Access.
 - [x] **Stage 3:** Core Business Logic (SolicitudAcademica Aggregate).
 - [x] **Stage 4:** Request API Implementation (Lifecycle).
-- [ ] **Stage 5:** Rule Engine (In progress), AI Suggestions, and Advanced Audit.
+- [x] **Stage 5 (Part 1):** Rule Engine (Triage Service) implemented.
+- [ ] **Stage 5 (Part 2):** AI Suggestions and Advanced Audit refinements.
 
 ---
 Developed as part of the **PISC** academic initiative.
