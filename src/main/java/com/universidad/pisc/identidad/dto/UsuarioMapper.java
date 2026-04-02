@@ -32,6 +32,19 @@ public class UsuarioMapper {
         );
     }
 
+    public UsuarioResumen toResumen(Usuario usuario) {
+        if (usuario == null) {
+            return null;
+        }
+        return new UsuarioResumen(
+                usuario.getId(),
+                usuario.getNombre(),
+                usuario.getApellido(),
+                usuario.getIdentificacion(),
+                usuario.getActivo()
+        );
+    }
+
     public Usuario toEntity(CrearUsuarioRequest request) {
         if (request == null) {
             return null;

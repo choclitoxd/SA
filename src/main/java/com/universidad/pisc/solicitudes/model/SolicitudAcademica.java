@@ -75,6 +75,13 @@ public class SolicitudAcademica {
     @Column(length = 1000)
     private String observacionCierre;
 
+    @Enumerated(EnumType.STRING)
+    private MotivoRechazo motivoRechazo;
+
+    @Size(min = 20, max = 2000)
+    @Column(length = 2000)
+    private String observacionResolucion;
+
     @NotNull
     @Column(nullable = false)
     private Integer contadorReaperturas = 0;
@@ -112,7 +119,45 @@ public class SolicitudAcademica {
         // Genera un código único simple antes de guardar.
         // Una implementación más robusta podría usar una secuencia de base de datos.
         if (this.codigo == null) {
-            this.codigo = String.format("SOL-%d-%d", LocalDateTime.now().getYear(), System.currentTimeMillis() % 100000);
+            this.codigo = String.format("SOL-%d-%d", LocalDateTime.now().getYear(), System.currentTimeMillis() % 1000000);
         }
+    }
+
+    /**
+     * Comprueba si la solicitud está vencida (fecha límite pasada y estado no final).
+     */
+    public boolean isVencida() {
+        if (this.fechaLimite == null || this.estado.isFinal()) {
+            return false;
+        }
+        return this.fechaLimite.isBefore(LocalDateTime.now());
+    }
+
+    /**
+     * Retorna el responsable actual de la solicitud (proyección de la asignación activa).
+     */
+    public Usuario getResponsableActual() {
+        return this.asignaciones.stream()
+                .filter(Asignacion::getActiva)
+                .map(Asignacion::getResponsable)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Helper para el motor de reglas: retorna el nombre del tipo de solicitud.
+     */
+    public String getTipoNombre() {
+        return this.tipo != null ? this.tipo.getNombre() : null;
+    }
+
+    /**
+     * Helper para el motor de reglas: retorna los días restantes hasta la fecha límite.
+     */
+    public Long getDiasRestantes() {
+        if (this.fechaLimite == null) {
+            return null;
+        }
+        return java.time.temporal.ChronoUnit.DAYS.between(LocalDateTime.now(), this.fechaLimite);
     }
 }

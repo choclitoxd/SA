@@ -3,12 +3,12 @@
 Este archivo sirve como contexto y guía para continuar el desarrollo del proyecto. Contiene el estado actual, la arquitectura y los pasos pendientes.
 
 ## 🚀 Estado del Proyecto
-Actualmente se han completado las **Etapas 1, 2 y 3** del plan de desarrollo.
+Actualmente se han completado las **Etapas 1, 2, 3 y 4** del plan de desarrollo.
 
 - [x] **Etapa 1: Fundación y Modelado del Dominio (Identidad y Catálogo).**
 - [x] **Etapa 2: Acceso a Datos y API de Gestión (Usuarios y Tipos de Solicitud).**
 - [x] **Etapa 3: Lógica de Negocio Principal - El Agregado `SolicitudAcademica`.**
-- [ ] **Etapa 4: Implementación de la API de Solicitudes (Ciclo de Vida).**
+- [x] **Etapa 4: Implementación de la API de Solicitudes (Ciclo de Vida).**
 - [ ] **Etapa 5: Funcionalidades Avanzadas (Motor de Reglas, IA, Auditoría).**
 
 ---
@@ -43,19 +43,15 @@ Actualmente se han completado las **Etapas 1, 2 y 3** del plan de desarrollo.
 
 ---
 
-## 📝 Próximos Pasos (Etapa 4)
+## 📝 Próximos Pasos (Etapa 5)
 
-El objetivo inmediato es implementar la **API de Solicitudes (`/solicitudes`)**.
+El objetivo ahora es implementar las **Funcionalidades Avanzadas**.
 
 ### Tareas Pendientes:
-1.  **DTOs de Solicitud:** Crear `RegistrarSolicitudRequest`, `SolicitudDetalleResponse`, etc.
-2.  **Mapper:** Crear `SolicitudMapper` para transformar la entidad y sus relaciones.
-3.  **Servicio de Solicitudes:** Implementar la lógica para:
-    - Registrar una solicitud (estado inicial `REGISTRADA`).
-    - Clasificar (cambio a `CLASIFICADA`).
-    - Asignar responsable (cambio a `EN_ATENCION`).
-    - Atender, Cerrar, Rechazar, etc.
-4.  **Controlador de Solicitudes:** Exponer los endpoints definidos en el archivo `openapi-solicitudes-academicas.yaml`.
+1.  **Motor de Reglas:** Implementar la lógica para evaluar `ReglaPrioridad` y asignar automáticamente el nivel de prioridad inicial.
+2.  **Sugerencias de IA:** Implementar la integración (simulada o real) con un servicio de IA para clasificar solicitudes.
+3.  **Auditoría y Historial:** Refinar la trazabilidad y los eventos de dominio.
+4.  **Seguridad y Roles:** Ajustar las autorizaciones de los endpoints según el rol del usuario autenticado.
 
 ---
 
@@ -64,4 +60,4 @@ Cuando retomes este proyecto:
 1. Lee este archivo `GEMINI.md`.
 2. Revisa el archivo `openapi-solicitudes-academicas.yaml`  para los contratos de los endpoints.
 3. Revisa el diagrama `domain-model-v2.puml`  para entender las relaciones entre entidades.
-4. Continúa con la **Etapa 4** (DTOs y Servicio de Solicitudes).
+4. Continúa con la **Etapa 5** (Funcionalidades Avanzadas).
