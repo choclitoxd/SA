@@ -1,0 +1,1993 @@
+openapi: 3.0.3
+
+info:
+  title: API — Sistema de Triage y Gestión de Solicitudes Académicas
+  description: |
+    API REST para el módulo de gestión del ciclo de vida completo de solicitudes académicas
+    del Programa de Ingeniería de Sistemas y Computación.
+
+    ## Flujo de estados soportado
+    ```
+    REGISTRADA → CLASIFICADA → EN_ATENCION → ATENDIDA → CERRADA
+                                    ↓               ↓
+                                 VENCIDA        IMPUGNADA
+                                    ↓
+                                 ESCALADA
+    ```
+
+    ## Autenticación
+    Todos los endpoints requieren un token JWT en el header `Authorization: Bearer <token>`.
+
+    ## Control de concurrencia
+    Las operaciones de escritura utilizan **Optimistic Locking** mediante el campo `version`.
+    Si se recibe un `409 Conflict`, el cliente debe recargar el recurso y reintentar.
+
+  version: 2.0.0
+  contact:
+    name: Equipo de Desarrollo — PISC
+    email: dev-pisc@universidad.edu.co
+  license:
+    name: MIT
+
+servers:
+  - url: https://api.pisc.universidad.edu.co/v2
+    description: Producción
+  - url: https://api-staging.pisc.universidad.edu.co/v2
+    description: Staging
+  - url: http://localhost:8080/v2
+    description: Desarrollo local
+
+tags:
+  - name: Solicitudes
+    description: Ciclo de vida completo de solicitudes académicas
+  - name: Transiciones
+    description: Cambios de estado y eventos de dominio
+  - name: Historial
+    description: Trazabilidad y auditoría
+  - name: Tipos de Solicitud
+    description: Catálogo de tipos y reglas de prioridad
+  - name: Usuarios
+    description: Gestión de usuarios y roles
+  - name: IA
+    description: Sugerencias opcionales mediante modelo de lenguaje
+
+# ══════════════════════════════════════════════════════════
+# PATHS
+# ══════════════════════════════════════════════════════════
+paths:
+
+  # ─────────────────────────────────────────────
+  # SOLICITUDES — CRUD base
+  # ─────────────────────────────────────────────
+  /solicitudes:
+    get:
+      tags: [Solicitudes]
+      summary: Listar solicitudes con filtros
+      description: |
+        Retorna una lista paginada de solicitudes. Soporta filtrado por múltiples criterios
+        combinables. Requiere rol `COORDINADOR`, `ADMINISTRATIVO` o `DIRECTOR`.
+      operationId: listarSolicitudes
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortParam'
+        - name: estado
+          in: query
+          description: Filtrar por estado del ciclo de vida
+          schema:
+            $ref: '#/components/schemas/EstadoSolicitud'
+        - name: tipoSolicitudId
+          in: query
+          description: Filtrar por tipo de solicitud
+          schema:
+            type: integer
+            format: int64
+        - name: prioridad
+          in: query
+          description: Filtrar por nivel de prioridad
+          schema:
+            $ref: '#/components/schemas/NivelPrioridad'
+        - name: responsableId
+          in: query
+          description: Filtrar por responsable asignado
+          schema:
+            type: integer
+            format: int64
+        - name: canal
+          in: query
+          description: Filtrar por canal de origen
+          schema:
+            $ref: '#/components/schemas/CanalOrigen'
+        - name: solicitanteId
+          in: query
+          description: Filtrar por identificación del solicitante
+          schema:
+            type: string
+        - name: fechaDesde
+          in: query
+          description: Filtrar solicitudes registradas desde esta fecha (ISO 8601)
+          schema:
+            type: string
+            format: date
+            example: "2024-03-01"
+        - name: fechaHasta
+          in: query
+          description: Filtrar solicitudes registradas hasta esta fecha (ISO 8601)
+          schema:
+            type: string
+            format: date
+            example: "2024-06-30"
+        - name: vencidas
+          in: query
+          description: Si true, retorna solo solicitudes con SLA expirado
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Lista paginada de solicitudes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageSolicitudResumen'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Solicitudes]
+      summary: Registrar nueva solicitud académica
+      description: |
+        Crea una nueva solicitud en estado `REGISTRADA`. Cualquier usuario autenticado
+        puede registrar una solicitud en nombre propio. El rol `ADMINISTRATIVO` puede
+        registrarla en nombre de otro usuario (campo `solicitanteId`).
+        
+        Si el servicio de IA está disponible, se dispara automáticamente la sugerencia
+        de clasificación en background (no bloquea la respuesta).
+      operationId: registrarSolicitud
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrarSolicitudRequest'
+            examples:
+              homologacion:
+                summary: Solicitud de homologación de asignatura
+                value:
+                  descripcion: "Solicito homologación de la materia Algoritmos cursada en Universidad Nacional, código UN-2025-ALG, nota 4.2"
+                  canal: CORREO
+                  solicitanteId: "1000234567"
+                  fechaLimite: "2024-04-15"
+              cupo:
+                summary: Solicitud de cupo en materia
+                value:
+                  descripcion: "Requiero cupo adicional en Bases de Datos II, grupo 02, docente Dr. García. El grupo 01 está lleno y no hay más opciones."
+                  canal: PRESENCIAL
+                  solicitanteId: "1000987654"
+      responses:
+        '201':
+          description: Solicitud registrada exitosamente
+          headers:
+            Location:
+              description: URL del recurso creado
+              schema:
+                type: string
+                example: /v2/solicitudes/4821
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudDetalleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /solicitudes/{id}:
+    get:
+      tags: [Solicitudes]
+      summary: Obtener solicitud por ID
+      description: Retorna el detalle completo de una solicitud incluyendo asignación activa y última entrada de historial.
+      operationId: obtenerSolicitud
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      responses:
+        '200':
+          description: Detalle completo de la solicitud
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudDetalleResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Solicitudes]
+      summary: Actualizar descripción de solicitud
+      description: |
+        Permite editar la descripción y canal de una solicitud **únicamente en estado `REGISTRADA`**.
+        En cualquier otro estado, retorna `409 Conflict`.
+        
+        Utiliza optimistic locking: se debe enviar el campo `version` obtenido en el último GET.
+      operationId: actualizarSolicitud
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarSolicitudRequest'
+      responses:
+        '200':
+          description: Solicitud actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudDetalleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  # ─────────────────────────────────────────────
+  # TRANSICIONES DE ESTADO
+  # ─────────────────────────────────────────────
+  /solicitudes/{id}/clasificar:
+    post:
+      tags: [Transiciones]
+      summary: Clasificar solicitud (tipo + prioridad)
+      description: |
+        Transita la solicitud de `REGISTRADA` → `CLASIFICADA`.
+        Requiere rol `COORDINADOR` o `ADMINISTRATIVO`.
+        
+        Si se recibe una `sugerenciaIaId`, el sistema valida que la sugerencia corresponda
+        a esta solicitud y registra si fue confirmada o ajustada.
+      operationId: clasificarSolicitud
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClasificarSolicitudRequest'
+      responses:
+        '200':
+          description: Solicitud clasificada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudDetalleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /solicitudes/{id}/asignar:
+    post:
+      tags: [Transiciones]
+      summary: Asignar responsable
+      description: |
+        Transita la solicitud de `CLASIFICADA` → `EN_ATENCION` (pasando por el estado
+        transitorio `ASIGNANDO` internamente).
+        
+        Requiere rol `COORDINADOR` o `DIRECTOR`. El responsable debe estar activo en el sistema.
+        La operación es atómica: si falla la persistencia, se retorna `503` y la solicitud
+        permanece en `CLASIFICADA`.
+      operationId: asignarResponsable
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AsignarResponsableRequest'
+      responses:
+        '200':
+          description: Responsable asignado, solicitud en atención
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudDetalleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /solicitudes/{id}/atender:
+    post:
+      tags: [Transiciones]
+      summary: Marcar solicitud como atendida
+      description: |
+        Transita la solicitud de `EN_ATENCION` → `ATENDIDA`.
+        Solo puede ser ejecutada por el responsable actualmente asignado.
+        La observación de resolución es obligatoria (mínimo 20 caracteres).
+      operationId: marcarAtendida
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarcarAtendidaRequest'
+      responses:
+        '200':
+          description: Solicitud marcada como atendida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudDetalleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /solicitudes/{id}/cerrar:
+    post:
+      tags: [Transiciones]
+      summary: Cerrar solicitud formalmente
+      description: |
+        Transita la solicitud de `ATENDIDA` → `CERRADA` (pasando por el estado transitorio
+        `CERRANDO` internamente con transacción ACID).
+        
+        **La solicitud queda inmutable tras el cierre.** No puede ser modificada bajo ninguna
+        circunstancia. Requiere rol `COORDINADOR` o `ADMINISTRATIVO`.
+        La observación de cierre es obligatoria (mínimo 20 caracteres).
+      operationId: cerrarSolicitud
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CerrarSolicitudRequest'
+      responses:
+        '200':
+          description: Solicitud cerrada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudDetalleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /solicitudes/{id}/rechazar:
+    post:
+      tags: [Transiciones]
+      summary: Rechazar solicitud
+      description: |
+        Transita la solicitud desde `REGISTRADA` o `CLASIFICADA` → `RECHAZADA`,
+        ejecutando compensación de efectos secundarios antes de finalizar.
+        
+        Requiere rol `COORDINADOR`. El motivo de rechazo es obligatorio y debe
+        corresponder a uno de los valores del enum `MotivoRechazo`.
+      operationId: rechazarSolicitud
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RechazarSolicitudRequest'
+      responses:
+        '200':
+          description: Solicitud rechazada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudDetalleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /solicitudes/{id}/cancelar:
+    post:
+      tags: [Transiciones]
+      summary: Cancelar solicitud (por el solicitante)
+      description: |
+        El solicitante cancela su propia solicitud.
+        
+        - Desde `REGISTRADA` o `CLASIFICADA`: inmediato.
+        - Desde `EN_ATENCION`: solo si el SLA de inactividad ha expirado.
+        
+        Un coordinador puede cancelar en nombre del estudiante en cualquier estado no final.
+      operationId: cancelarSolicitud
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelarSolicitudRequest'
+      responses:
+        '200':
+          description: Solicitud cancelada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudDetalleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /solicitudes/{id}/reabrir:
+    post:
+      tags: [Transiciones]
+      summary: Reabrir solicitud para nueva atención
+      description: |
+        Transita de `ATENDIDA` → `EN_ATENCION`.
+        Solo disponible si `contadorReaperturas < MAX_REAP` (por defecto 3).
+        Al superarlo, el sistema fuerza la transición a `ESCALADA` automáticamente.
+        Requiere rol `COORDINADOR`.
+      operationId: reabrirSolicitud
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReopenRequest'
+      responses:
+        '200':
+          description: Solicitud reabierta o escalada automáticamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudDetalleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /solicitudes/{id}/impugnar:
+    post:
+      tags: [Transiciones]
+      summary: Impugnar resolución de solicitud
+      description: |
+        El estudiante impugna la resolución. Transita de `ATENDIDA` → `IMPUGNADA`.
+        El coordinador puede aceptar la impugnación (→ `EN_ATENCION`) o rechazarla (→ `CERRADA`),
+        decisión que requiere rol `DIRECTOR`.
+      operationId: impugnarSolicitud
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImpugnarRequest'
+      responses:
+        '200':
+          description: Impugnación registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudDetalleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /solicitudes/{id}/escalar:
+    post:
+      tags: [Transiciones]
+      summary: Escalar solicitud al Director
+      description: |
+        Transita a `ESCALADA`. Disponible desde `VENCIDA` o cuando `contadorReaperturas >= MAX_REAP`.
+        Requiere rol `DIRECTOR` o `COORDINADOR`.
+      operationId: escalarSolicitud
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EscalarRequest'
+      responses:
+        '200':
+          description: Solicitud escalada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudDetalleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /solicitudes/{id}/reclasificar:
+    post:
+      tags: [Transiciones]
+      summary: Reclasificar solicitud en atención
+      description: |
+        Permite corregir el tipo o prioridad cuando la solicitud ya está en `EN_ATENCION`.
+        Requiere rol `COORDINADOR`. Registra el contador de reclasificaciones.
+      operationId: reclasificarSolicitud
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReclasificarRequest'
+      responses:
+        '200':
+          description: Solicitud reclasificada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudDetalleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  # ─────────────────────────────────────────────
+  # HISTORIAL
+  # ─────────────────────────────────────────────
+  /solicitudes/{id}/historial:
+    get:
+      tags: [Historial]
+      summary: Obtener historial de auditoría de una solicitud
+      description: |
+        Retorna el historial completo de acciones realizadas sobre la solicitud,
+        ordenado cronológicamente de más reciente a más antiguo.
+        Es inmutable: no admite escritura directa.
+      operationId: obtenerHistorial
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: Historial de la solicitud
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageHistorialEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─────────────────────────────────────────────
+  # IA — SUGERENCIAS
+  # ─────────────────────────────────────────────
+  /solicitudes/{id}/ia/sugerencia:
+    get:
+      tags: [IA]
+      summary: Obtener sugerencia de clasificación generada por IA
+      description: |
+        Retorna la sugerencia de tipo y prioridad generada por el LLM para esta solicitud.
+        Si la sugerencia aún está siendo procesada, retorna `202 Accepted`.
+        Si el servicio de IA no está disponible, retorna `503` con `circuitBreaker: OPEN`.
+        
+        **La sugerencia siempre debe ser confirmada o ajustada por un humano** (RF-10).
+      operationId: obtenerSugerenciaIA
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      responses:
+        '200':
+          description: Sugerencia disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SugerenciaIAResponse'
+        '202':
+          description: Sugerencia en proceso de generación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SugerenciaIAPendienteResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    post:
+      tags: [IA]
+      summary: Solicitar nueva sugerencia de IA
+      description: |
+        Dispara manualmente la generación de una sugerencia. Útil si la sugerencia
+        automática falló o si la descripción fue actualizada.
+      operationId: solicitarSugerenciaIA
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+      responses:
+        '202':
+          description: Solicitud de sugerencia encolada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SugerenciaIAPendienteResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  # ─────────────────────────────────────────────
+  # TIPOS DE SOLICITUD
+  # ─────────────────────────────────────────────
+  /tipos-solicitud:
+    get:
+      tags: [Tipos de Solicitud]
+      summary: Listar tipos de solicitud activos
+      operationId: listarTiposSolicitud
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: activo
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Lista de tipos de solicitud
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TipoSolicitudResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Tipos de Solicitud]
+      summary: Crear nuevo tipo de solicitud
+      description: Requiere rol `DIRECTOR` o `ADMINISTRATIVO`.
+      operationId: crearTipoSolicitud
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearTipoSolicitudRequest'
+      responses:
+        '201':
+          description: Tipo creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TipoSolicitudResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /tipos-solicitud/{id}:
+    put:
+      tags: [Tipos de Solicitud]
+      summary: Actualizar tipo de solicitud
+      operationId: actualizarTipoSolicitud
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearTipoSolicitudRequest'
+      responses:
+        '200':
+          description: Tipo actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TipoSolicitudResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Tipos de Solicitud]
+      summary: Desactivar tipo de solicitud (soft delete)
+      description: |
+        No elimina físicamente el registro. Marca el tipo como `activo: false`.
+        No se puede desactivar un tipo con solicitudes activas asociadas.
+      operationId: desactivarTipoSolicitud
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Tipo desactivado exitosamente
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  # ─────────────────────────────────────────────
+  # USUARIOS
+  # ─────────────────────────────────────────────
+  /usuarios:
+    get:
+      tags: [Usuarios]
+      summary: Listar usuarios del sistema
+      operationId: listarUsuarios
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: activo
+          in: query
+          schema:
+            type: boolean
+        - name: rol
+          in: query
+          schema:
+            $ref: '#/components/schemas/NombreRol'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: Lista paginada de usuarios
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageUsuarioResumen'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Usuarios]
+      summary: Crear usuario
+      operationId: crearUsuario
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearUsuarioRequest'
+      responses:
+        '201':
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsuarioResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /usuarios/{id}:
+    get:
+      tags: [Usuarios]
+      summary: Obtener usuario por ID
+      operationId: obtenerUsuario
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Datos del usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsuarioResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Usuarios]
+      summary: Actualizar datos de usuario
+      operationId: actualizarUsuario
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarUsuarioRequest'
+      responses:
+        '200':
+          description: Usuario actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsuarioResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Usuarios]
+      summary: Desactivar usuario (soft delete)
+      description: |
+        Marca el usuario como inactivo. Las solicitudes que tuviera en `EN_ATENCION`
+        disparan automáticamente el evento `ResponsableDesactivado` y pasan a `REASIGNANDO`.
+      operationId: desactivarUsuario
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Usuario desactivado
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+# ══════════════════════════════════════════════════════════
+# COMPONENTS
+# ══════════════════════════════════════════════════════════
+components:
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token JWT obtenido en el endpoint de autenticación institucional.
+
+  # ─────────────────────────────────────────────
+  # PARAMETERS
+  # ─────────────────────────────────────────────
+  parameters:
+    SolicitudId:
+      name: id
+      in: path
+      required: true
+      description: Identificador único de la solicitud
+      schema:
+        type: integer
+        format: int64
+        example: 4821
+
+    PageParam:
+      name: page
+      in: query
+      description: Número de página (base 0)
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+    SizeParam:
+      name: size
+      in: query
+      description: Elementos por página
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+    SortParam:
+      name: sort
+      in: query
+      description: 'Campo y dirección de ordenamiento (ej: fechaRegistro,desc)'
+      schema:
+        type: string
+        example: fechaRegistro,desc
+
+  # ─────────────────────────────────────────────
+  # SCHEMAS — ENUMS
+  # ─────────────────────────────────────────────
+  schemas:
+
+    EstadoSolicitud:
+      type: string
+      description: Estado del ciclo de vida de la solicitud
+      enum:
+        - REGISTRADA
+        - CLASIFICADA
+        - EN_ATENCION
+        - ATENDIDA
+        - CERRADA
+        - RECHAZADA
+        - CANCELADA
+        - VENCIDA
+        - ESCALADA
+        - IMPUGNADA
+      example: CLASIFICADA
+
+    NivelPrioridad:
+      type: string
+      enum:
+        - CRITICA
+        - ALTA
+        - MEDIA
+        - BAJA
+      example: ALTA
+
+    CanalOrigen:
+      type: string
+      enum:
+        - CSU
+        - CORREO
+        - SAC
+        - TELEFONICO
+        - PRESENCIAL
+        - SISTEMA_ACADEMICO
+      example: CORREO
+
+    NombreRol:
+      type: string
+      enum:
+        - ESTUDIANTE
+        - COORDINADOR
+        - ADMINISTRATIVO
+        - DIRECTOR
+      example: COORDINADOR
+
+    MotivoRechazo:
+      type: string
+      enum:
+        - DUPLICADA
+        - INVALIDA
+        - FUERA_DE_ALCANCE
+        - INFORMACION_INSUFICIENTE
+        - PLAZO_VENCIDO
+      example: DUPLICADA
+
+    # ─────────────────────────────────────────────
+    # SCHEMAS — REQUEST BODIES
+    # ─────────────────────────────────────────────
+
+    RegistrarSolicitudRequest:
+      type: object
+      required:
+        - descripcion
+        - canal
+        - solicitanteId
+      properties:
+        descripcion:
+          type: string
+          minLength: 30
+          maxLength: 2000
+          description: Descripción detallada de la solicitud. Mínimo 30 caracteres.
+          example: "Solicito homologación de la materia Algoritmos cursada en Universidad Nacional con nota 4.2"
+        canal:
+          $ref: '#/components/schemas/CanalOrigen'
+        solicitanteId:
+          type: string
+          minLength: 7
+          maxLength: 15
+          pattern: '^\d{7,15}$'
+          description: Número de identificación del estudiante solicitante
+          example: "1000234567"
+        fechaLimite:
+          type: string
+          format: date
+          description: Fecha límite institucional asociada (ISO 8601). Debe ser futura.
+          example: "2024-06-15"
+
+    ActualizarSolicitudRequest:
+      type: object
+      required:
+        - version
+      properties:
+        descripcion:
+          type: string
+          minLength: 30
+          maxLength: 2000
+        canal:
+          $ref: '#/components/schemas/CanalOrigen'
+        fechaLimite:
+          type: string
+          format: date
+        version:
+          type: integer
+          format: int64
+          description: Versión actual del recurso para Optimistic Locking
+          example: 3
+
+    ClasificarSolicitudRequest:
+      type: object
+      required:
+        - tipoSolicitudId
+        - nivelPrioridad
+        - justificacionPrioridad
+        - version
+      properties:
+        tipoSolicitudId:
+          type: integer
+          format: int64
+          description: ID del tipo de solicitud del catálogo
+          example: 2
+        nivelPrioridad:
+          $ref: '#/components/schemas/NivelPrioridad'
+        justificacionPrioridad:
+          type: string
+          minLength: 20
+          maxLength: 500
+          description: Justificación de la prioridad asignada
+          example: "Solicitud de homologación con fecha límite de matrícula próxima, impacto académico alto"
+        sugerenciaIaId:
+          type: integer
+          format: int64
+          description: ID de la SugerenciaIA si se está confirmando o ajustando una sugerencia del LLM
+          nullable: true
+        version:
+          type: integer
+          format: int64
+          example: 1
+
+    AsignarResponsableRequest:
+      type: object
+      required:
+        - responsableId
+        - version
+      properties:
+        responsableId:
+          type: integer
+          format: int64
+          description: ID del usuario activo que atenderá la solicitud
+          example: 87
+        notas:
+          type: string
+          maxLength: 500
+          description: Notas internas sobre la asignación
+          nullable: true
+        version:
+          type: integer
+          format: int64
+          example: 2
+
+    MarcarAtendidaRequest:
+      type: object
+      required:
+        - observacionResolucion
+        - version
+      properties:
+        observacionResolucion:
+          type: string
+          minLength: 20
+          maxLength: 2000
+          description: Descripción detallada de la resolución aplicada
+          example: "Se aprobó la homologación. Se registró en el sistema académico con código HOM-2024-0041."
+        version:
+          type: integer
+          format: int64
+          example: 4
+
+    CerrarSolicitudRequest:
+      type: object
+      required:
+        - observacionCierre
+        - version
+      properties:
+        observacionCierre:
+          type: string
+          minLength: 20
+          maxLength: 1000
+          description: Observación final de cierre formal. Obligatoria e inmutable.
+          example: "Solicitud resuelta y notificada al estudiante. Documentación archivada en expediente digital."
+        version:
+          type: integer
+          format: int64
+          example: 5
+
+    RechazarSolicitudRequest:
+      type: object
+      required:
+        - motivo
+        - justificacion
+        - version
+      properties:
+        motivo:
+          $ref: '#/components/schemas/MotivoRechazo'
+        justificacion:
+          type: string
+          minLength: 20
+          maxLength: 1000
+          description: Explicación detallada del motivo de rechazo
+          example: "Solicitud idéntica a la registrada con código SOL-2024-4712 el día 2024-03-10."
+        version:
+          type: integer
+          format: int64
+          example: 1
+
+    CancelarSolicitudRequest:
+      type: object
+      required:
+        - motivo
+        - version
+      properties:
+        motivo:
+          type: string
+          minLength: 10
+          maxLength: 500
+          description: Razón de la cancelación por parte del solicitante
+          example: "El problema fue resuelto directamente con el docente."
+        version:
+          type: integer
+          format: int64
+          example: 2
+
+    ReopenRequest:
+      type: object
+      required:
+        - justificacion
+        - version
+      properties:
+        justificacion:
+          type: string
+          minLength: 20
+          maxLength: 500
+          description: Razón por la cual la resolución fue insuficiente
+        version:
+          type: integer
+          format: int64
+
+    ImpugnarRequest:
+      type: object
+      required:
+        - motivoImpugnacion
+        - version
+      properties:
+        motivoImpugnacion:
+          type: string
+          minLength: 30
+          maxLength: 1000
+          description: Descripción del desacuerdo con la resolución
+        version:
+          type: integer
+          format: int64
+
+    EscalarRequest:
+      type: object
+      required:
+        - motivoEscalada
+        - version
+      properties:
+        motivoEscalada:
+          type: string
+          minLength: 20
+          maxLength: 500
+        version:
+          type: integer
+          format: int64
+
+    ReclasificarRequest:
+      type: object
+      required:
+        - tipoSolicitudId
+        - nivelPrioridad
+        - justificacion
+        - version
+      properties:
+        tipoSolicitudId:
+          type: integer
+          format: int64
+        nivelPrioridad:
+          $ref: '#/components/schemas/NivelPrioridad'
+        justificacion:
+          type: string
+          minLength: 20
+          maxLength: 500
+          description: Razón del error de clasificación previo
+        version:
+          type: integer
+          format: int64
+
+    CrearTipoSolicitudRequest:
+      type: object
+      required:
+        - nombre
+        - descripcion
+        - tiempoAtencionDias
+      properties:
+        nombre:
+          type: string
+          minLength: 3
+          maxLength: 100
+          example: "Homologación de asignaturas"
+        descripcion:
+          type: string
+          maxLength: 500
+        tiempoAtencionDias:
+          type: integer
+          minimum: 1
+          maximum: 90
+          description: SLA en días hábiles para este tipo
+          example: 15
+
+    CrearUsuarioRequest:
+      type: object
+      required:
+        - nombre
+        - apellido
+        - email
+        - identificacion
+        - roles
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 100
+        apellido:
+          type: string
+          minLength: 2
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          example: "juan.perez@universidad.edu.co"
+        identificacion:
+          type: string
+          pattern: '^\d{7,15}$'
+          example: "1000234567"
+        roles:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/NombreRol'
+
+    ActualizarUsuarioRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 100
+        apellido:
+          type: string
+          minLength: 2
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        roles:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/NombreRol'
+
+    # ─────────────────────────────────────────────
+    # SCHEMAS — RESPONSES
+    # ─────────────────────────────────────────────
+
+    SolicitudDetalleResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 4821
+        codigo:
+          type: string
+          description: Código legible generado automáticamente
+          example: "SOL-2024-04821"
+        descripcion:
+          type: string
+          example: "Solicito homologación de la materia Algoritmos..."
+        canal:
+          $ref: '#/components/schemas/CanalOrigen'
+        estado:
+          $ref: '#/components/schemas/EstadoSolicitud'
+        tipo:
+          $ref: '#/components/schemas/TipoSolicitudResponse'
+        prioridad:
+          $ref: '#/components/schemas/PrioridadResponse'
+        solicitante:
+          $ref: '#/components/schemas/UsuarioResumen'
+        responsableActual:
+          $ref: '#/components/schemas/UsuarioResumen'
+          nullable: true
+        contadorReaperturas:
+          type: integer
+          example: 1
+        fechaRegistro:
+          type: string
+          format: date-time
+          example: "2024-03-15T09:23:41Z"
+        fechaUltimaActualizacion:
+          type: string
+          format: date-time
+          example: "2024-03-17T14:05:22Z"
+        fechaLimite:
+          type: string
+          format: date
+          nullable: true
+          example: "2024-06-15"
+        observacionCierre:
+          type: string
+          nullable: true
+        sugerenciaIA:
+          $ref: '#/components/schemas/SugerenciaIAResponse'
+          nullable: true
+        version:
+          type: integer
+          format: int64
+          description: Campo de Optimistic Locking. Requerido en operaciones de escritura.
+          example: 3
+        _links:
+          $ref: '#/components/schemas/SolicitudLinks'
+
+    SolicitudResumen:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        codigo:
+          type: string
+          example: "SOL-2024-04821"
+        estado:
+          $ref: '#/components/schemas/EstadoSolicitud'
+        tipoNombre:
+          type: string
+          example: "Homologación de asignaturas"
+        prioridad:
+          $ref: '#/components/schemas/NivelPrioridad'
+        solicitanteNombre:
+          type: string
+          example: "Juan Pérez"
+        responsableNombre:
+          type: string
+          nullable: true
+        fechaRegistro:
+          type: string
+          format: date-time
+        fechaLimite:
+          type: string
+          format: date
+          nullable: true
+        vencida:
+          type: boolean
+          description: true si la fecha límite ha pasado y la solicitud no está cerrada
+
+    PrioridadResponse:
+      type: object
+      properties:
+        nivel:
+          $ref: '#/components/schemas/NivelPrioridad'
+        justificacion:
+          type: string
+        asignadaEn:
+          type: string
+          format: date-time
+
+    TipoSolicitudResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        nombre:
+          type: string
+          example: "Homologación de asignaturas"
+        descripcion:
+          type: string
+        tiempoAtencionDias:
+          type: integer
+          example: 15
+        activo:
+          type: boolean
+
+    HistorialEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        fechaHora:
+          type: string
+          format: date-time
+          example: "2024-03-16T10:15:00Z"
+        accionRealizada:
+          type: string
+          example: "clasificarSolicitud"
+        estadoAnterior:
+          $ref: '#/components/schemas/EstadoSolicitud'
+          nullable: true
+        estadoNuevo:
+          $ref: '#/components/schemas/EstadoSolicitud'
+        observaciones:
+          type: string
+          nullable: true
+        usuarioResponsable:
+          $ref: '#/components/schemas/UsuarioResumen'
+
+    UsuarioResumen:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        nombre:
+          type: string
+          example: "Juan"
+        apellido:
+          type: string
+          example: "Pérez"
+        identificacion:
+          type: string
+          example: "1000234567"
+        activo:
+          type: boolean
+
+    UsuarioResponse:
+      allOf:
+        - $ref: '#/components/schemas/UsuarioResumen'
+        - type: object
+          properties:
+            email:
+              type: string
+              format: email
+            roles:
+              type: array
+              items:
+                $ref: '#/components/schemas/NombreRol'
+            creadoEn:
+              type: string
+              format: date-time
+
+    SugerenciaIAResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        tipoSugerido:
+          $ref: '#/components/schemas/TipoSolicitudResponse'
+        prioridadSugerida:
+          $ref: '#/components/schemas/NivelPrioridad'
+        justificacionIA:
+          type: string
+          description: Explicación del modelo sobre su sugerencia
+        confianza:
+          type: number
+          format: double
+          minimum: 0.0
+          maximum: 1.0
+          description: Nivel de confianza del modelo (0.0 a 1.0)
+          example: 0.87
+        confirmada:
+          type: boolean
+          description: true si un coordinador aceptó la sugerencia sin cambios
+        ajustada:
+          type: boolean
+          description: true si la sugerencia fue modificada antes de aplicarse
+        generadaEn:
+          type: string
+          format: date-time
+
+    SugerenciaIAPendienteResponse:
+      type: object
+      properties:
+        mensaje:
+          type: string
+          example: "La sugerencia está siendo generada. Consulte nuevamente en unos segundos."
+        solicitudId:
+          type: integer
+          format: int64
+        pollingUrl:
+          type: string
+          example: "/v2/solicitudes/4821/ia/sugerencia"
+        estimadoSegundos:
+          type: integer
+          example: 5
+
+    # ─────────────────────────────────────────────
+    # SCHEMAS — PAGINACIÓN
+    # ─────────────────────────────────────────────
+
+    PageSolicitudResumen:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/SolicitudResumen'
+        page:
+          $ref: '#/components/schemas/PageMetadata'
+
+    PageHistorialEntry:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/HistorialEntry'
+        page:
+          $ref: '#/components/schemas/PageMetadata'
+
+    PageUsuarioResumen:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/UsuarioResumen'
+        page:
+          $ref: '#/components/schemas/PageMetadata'
+
+    PageMetadata:
+      type: object
+      properties:
+        size:
+          type: integer
+          example: 20
+        number:
+          type: integer
+          example: 0
+        totalElements:
+          type: integer
+          format: int64
+          example: 143
+        totalPages:
+          type: integer
+          example: 8
+
+    # ─────────────────────────────────────────────
+    # SCHEMAS — HATEOAS LINKS
+    # ─────────────────────────────────────────────
+
+    SolicitudLinks:
+      type: object
+      description: Links HATEOAS con las acciones disponibles según el estado actual
+      properties:
+        self:
+          type: string
+          example: "/v2/solicitudes/4821"
+        historial:
+          type: string
+          example: "/v2/solicitudes/4821/historial"
+        clasificar:
+          type: string
+          nullable: true
+          example: "/v2/solicitudes/4821/clasificar"
+        asignar:
+          type: string
+          nullable: true
+          example: "/v2/solicitudes/4821/asignar"
+        atender:
+          type: string
+          nullable: true
+        cerrar:
+          type: string
+          nullable: true
+        rechazar:
+          type: string
+          nullable: true
+        cancelar:
+          type: string
+          nullable: true
+        reabrir:
+          type: string
+          nullable: true
+        impugnar:
+          type: string
+          nullable: true
+        escalar:
+          type: string
+          nullable: true
+
+    # ─────────────────────────────────────────────
+    # SCHEMAS — ERRORES
+    # ─────────────────────────────────────────────
+
+    ErrorResponse:
+      type: object
+      required:
+        - timestamp
+        - status
+        - error
+        - message
+        - path
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          example: "2024-03-15T10:23:41Z"
+        status:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: "Bad Request"
+        code:
+          type: string
+          description: Código interno de error para soporte
+          example: "SOL-001"
+        message:
+          type: string
+          example: "La descripción de la solicitud es obligatoria y debe tener mínimo 30 caracteres."
+        path:
+          type: string
+          example: "/v2/solicitudes"
+        details:
+          type: array
+          description: Detalle de errores de validación por campo
+          items:
+            $ref: '#/components/schemas/ValidationError'
+
+    ValidationError:
+      type: object
+      properties:
+        field:
+          type: string
+          example: "descripcion"
+        rejectedValue:
+          type: string
+          nullable: true
+          example: "Necesito cupo"
+        message:
+          type: string
+          example: "La descripción debe tener entre 30 y 2000 caracteres"
+
+    ConflictResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          example: 409
+        error:
+          type: string
+          example: "Conflict"
+        code:
+          type: string
+          description: |
+            Códigos posibles:
+            - TRANSICION_INVALIDA: el estado actual no permite esta operación
+            - OPTIMISTIC_LOCK: versión desactualizada, recargar el recurso
+            - SOLICITUD_INMUTABLE: la solicitud está en estado final
+            - RECURSO_EN_USO: el tipo tiene solicitudes activas
+        message:
+          type: string
+          example: "No es posible clasificar una solicitud en estado EN_ATENCION."
+        estadoActual:
+          $ref: '#/components/schemas/EstadoSolicitud'
+          nullable: true
+        path:
+          type: string
+
+    ServiceUnavailableResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          example: 503
+        error:
+          type: string
+          example: "Service Unavailable"
+        code:
+          type: string
+          example: "IA_CIRCUIT_BREAKER_OPEN"
+        message:
+          type: string
+          example: "El servicio de IA no está disponible. Proceda con clasificación manual."
+        circuitBreaker:
+          type: string
+          enum: [CLOSED, OPEN, HALF_OPEN]
+          example: OPEN
+        retryAfterSeconds:
+          type: integer
+          nullable: true
+          example: 60
+
+  # ─────────────────────────────────────────────
+  # RESPONSES REUTILIZABLES
+  # ─────────────────────────────────────────────
+  responses:
+    BadRequest:
+      description: Parámetros o body inválidos (validación fallida)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: "2024-03-15T10:23:41Z"
+            status: 400
+            error: "Bad Request"
+            code: "VAL-001"
+            message: "Errores de validación en la solicitud"
+            path: "/v2/solicitudes"
+            details:
+              - field: "descripcion"
+                rejectedValue: "Cupo"
+                message: "La descripción debe tener entre 30 y 2000 caracteres"
+              - field: "solicitanteId"
+                rejectedValue: "abc"
+                message: "El identificador debe contener solo dígitos"
+
+    Unauthorized:
+      description: Token JWT ausente, inválido o expirado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: "2024-03-15T10:23:41Z"
+            status: 401
+            error: "Unauthorized"
+            code: "AUTH-001"
+            message: "Token JWT inválido o expirado."
+            path: "/v2/solicitudes"
+
+    Forbidden:
+      description: El usuario no tiene el rol requerido para esta operación
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: "2024-03-15T10:23:41Z"
+            status: 403
+            error: "Forbidden"
+            code: "AUTH-002"
+            message: "Se requiere rol COORDINADOR para clasificar solicitudes."
+            path: "/v2/solicitudes/4821/clasificar"
+
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: "2024-03-15T10:23:41Z"
+            status: 404
+            error: "Not Found"
+            code: "SOL-404"
+            message: "No se encontró la solicitud con ID 9999."
+            path: "/v2/solicitudes/9999"
+
+    Conflict:
+      description: Conflicto de estado (transición inválida, optimistic lock o recurso inmutable)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ConflictResponse'
+          examples:
+            transicionInvalida:
+              summary: Transición de estado no permitida
+              value:
+                timestamp: "2024-03-15T10:23:41Z"
+                status: 409
+                error: "Conflict"
+                code: "TRANSICION_INVALIDA"
+                message: "No es posible clasificar una solicitud en estado EN_ATENCION."
+                estadoActual: "EN_ATENCION"
+                path: "/v2/solicitudes/4821/clasificar"
+            optimisticLock:
+              summary: Versión desactualizada
+              value:
+                timestamp: "2024-03-15T10:23:41Z"
+                status: 409
+                error: "Conflict"
+                code: "OPTIMISTIC_LOCK"
+                message: "La solicitud fue modificada por otro usuario. Recargue y reintente."
+                estadoActual: null
+                path: "/v2/solicitudes/4821/clasificar"
+            solicitudInmutable:
+              summary: Solicitud en estado final
+              value:
+                timestamp: "2024-03-15T10:23:41Z"
+                status: 409
+                error: "Conflict"
+                code: "SOLICITUD_INMUTABLE"
+                message: "La solicitud SOL-2024-04821 está CERRADA y no puede ser modificada."
+                estadoActual: "CERRADA"
+                path: "/v2/solicitudes/4821/cerrar"
+
+    UnprocessableEntity:
+      description: Lógica de negocio violada (datos válidos pero inconsistentes con el dominio)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: "2024-03-15T10:23:41Z"
+            status: 422
+            error: "Unprocessable Entity"
+            code: "BIZ-001"
+            message: "El usuario ID 87 no está activo y no puede ser asignado como responsable."
+            path: "/v2/solicitudes/4821/asignar"
+
+    ServiceUnavailable:
+      description: Servicio externo (IA, BD) no disponible temporalmente
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ServiceUnavailableResponse'

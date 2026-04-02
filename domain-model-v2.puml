@@ -1,0 +1,280 @@
+@startuml DomainModel_SolicitudesAcademicas_v2
+!theme plain
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam classFontSize 13
+skinparam packageFontSize 14
+
+' ══════════════════════════════════════════════
+' PACKAGE: IDENTIDAD Y ACCESO
+' ══════════════════════════════════════════════
+package "Identidad y Acceso" #EEF2FF {
+
+  class Usuario {
+    ' ── Identidad ──
+    - id           : Long            <<@Id, @GeneratedValue>>
+    - version      : Long            <<@Version>> [FIX-1]
+    - nombre       : String          <<NotNull, Size(2,100)>>
+    - apellido     : String          <<NotNull, Size(2,100)>>
+    - email        : String          <<NotNull, Email, Unique>>
+    - passwordHash : String          <<NotNull>>
+    - identificacion : String        <<NotNull, Pattern(\d{7,15}), Unique>>
+    ' ── Estado ──
+    - activo       : Boolean         <<NotNull, default=true>>
+    - creadoEn     : LocalDateTime   <<NotNull>>
+    ' ── Métodos de dominio ──
+    + autenticar(password: String) : Boolean
+    + tieneRol(rol: NombreRol) : Boolean
+    + activar() : void
+    + desactivar() : void    ' dispara evento ResponsableDesactivado
+  }
+
+  class Rol {
+    - id          : Long     <<@Id, @GeneratedValue>>
+    - nombre      : NombreRol <<NotNull, Unique>>
+    - descripcion : String
+  }
+
+  enum NombreRol {
+    ESTUDIANTE
+    COORDINADOR
+    ADMINISTRATIVO
+    DIRECTOR
+  }
+
+  Usuario "1..*" -- "1..*" Rol : tiene >
+  Rol --> NombreRol
+}
+
+' ══════════════════════════════════════════════
+' PACKAGE: CATÁLOGO
+' ══════════════════════════════════════════════
+package "Catálogo" #F0FFF4 {
+
+  class TipoSolicitud {
+    - id                  : Long    <<@Id, @GeneratedValue>>
+    - version             : Long    <<@Version>> [FIX-1]
+    - nombre              : String  <<NotNull, Size(3,100), Unique>>
+    - descripcion         : String  <<Size(0,500)>>
+    - activo              : Boolean <<NotNull, default=true>>
+    - tiempoAtencionDias  : Integer <<NotNull, Min(1), Max(90)>>
+    ' [FIX-6] ReglaPrioridad se gestiona separada pero referencia TipoSolicitud
+    + getNombre() : String
+    + esActivo() : Boolean
+  }
+
+  class ReglaPrioridad {
+    ' [FIX-6] Entidad expuesta: tiene endpoint propio GET/POST/PUT/DELETE
+    - id              : Long         <<@Id, @GeneratedValue>>
+    - version         : Long         <<@Version>> [FIX-1]
+    - nombre          : String       <<NotNull, Size(3,100)>>
+    - descripcion     : String
+    ' condicion: expresión DSL evaluable, ej: "tipo=HOMOLOGACION AND diasRestantes < 15"
+    - condicion       : String       <<NotNull>>
+    - nivelResultante : NivelPrioridad <<NotNull>>
+    - peso            : Integer      <<NotNull, Min(1)>>  ' desempate entre reglas
+    - activa          : Boolean      <<NotNull, default=true>>
+    + evaluar(solicitud: SolicitudAcademica) : Boolean
+    + getNivelResultante() : NivelPrioridad
+  }
+
+  enum NivelPrioridad {
+    CRITICA
+    ALTA
+    MEDIA
+    BAJA
+  }
+}
+
+' ══════════════════════════════════════════════
+' PACKAGE: SOLICITUDES (AGREGADO RAÍZ)
+' ══════════════════════════════════════════════
+package "Solicitudes" #FFF7ED {
+
+  class SolicitudAcademica <<AggregateRoot>> {
+    ' ── Identidad ──
+    - id                    : Long           <<@Id, @GeneratedValue>>
+    - version               : Long           <<@Version>> [FIX-1]
+    - codigo                : String         <<NotNull, Unique>>  [FIX-4] ej: "SOL-2024-04821"
+    ' ── Datos de registro (RF-01) ──
+    - descripcion           : String         <<NotNull, Size(30,2000)>>
+    - canal                 : CanalOrigen    <<NotNull>>
+    - fechaRegistro         : LocalDateTime  <<NotNull>>
+    - fechaUltimaActualizacion : LocalDateTime <<NotNull>>
+    - fechaLimite           : LocalDateTime  <<Nullable>> [FIX-12] era ausente
+    ' ── Estado y clasificación ──
+    - estado                : EstadoSolicitud <<NotNull, default=REGISTRADA>>
+    - observacionCierre     : String         <<Nullable, Size(20,1000)>> [FIX-13]
+    ' ── Contadores de ciclo de vida [FIX-2, FIX-3] ──
+    - contadorReaperturas   : Integer        <<NotNull, default=0>> [FIX-2]
+    - contadorReclasificaciones : Integer    <<NotNull, default=0>> [FIX-3]
+    ' ── Métodos de dominio ──
+    + registrar() : void
+    + clasificar(tipo: TipoSolicitud, prioridad: Prioridad) : void
+    + asignarResponsable(responsable: Usuario, asignadoPor: Usuario) : Asignacion
+    + iniciarAtencion() : void
+    + marcarAtendida(observacion: String) : void
+    + cerrar(observacion: String) : void
+    + rechazar(motivo: MotivoRechazo, justificacion: String) : void
+    + cancelar(motivo: String) : void
+    + reabrir(justificacion: String) : void    ' incrementa contadorReaperturas
+    + reclasificar(tipo: TipoSolicitud, prioridad: NivelPrioridad, justificacion: String) : void
+    + impugnar(motivo: String) : void
+    + escalar(motivo: String) : void
+    ' ── Métodos de consulta / proyección ──
+    + esCerrada() : Boolean
+    + validarTransicion(nuevoEstado: EstadoSolicitud) : Boolean
+    + isVencida() : Boolean  [FIX-6] ' derivado: fechaLimite < now() AND estado != CERRADA/etc.
+    + getResponsableActual() : Usuario  [FIX-4] ' proyección: Asignacion donde activa=true
+  }
+
+  note right of SolicitudAcademica
+    [FIX-4] responsableActual es PROYECCIÓN CALCULADA:
+    getResponsableActual() = asignaciones
+      .stream()
+      .filter(a -> a.activa)
+      .map(Asignacion::getResponsable)
+      .findFirst()
+      .orElse(null)
+
+    [FIX-6] isVencida() es campo DERIVADO:
+    fechaLimite != null
+      AND fechaLimite.isBefore(now())
+      AND !estado.isFinal()
+    NO se persiste; se calcula en memoria.
+  end note
+
+  class Prioridad <<ValueObject>> {
+    ' Value Object: sin identidad propia, embebido en SolicitudAcademica
+    - nivel           : NivelPrioridad <<NotNull>>
+    - justificacion   : String         <<NotNull, Size(20,500)>>
+    - asignadaEn      : LocalDateTime  <<NotNull>>
+    + getNivel() : NivelPrioridad
+  }
+
+  class Asignacion {
+    ' [FIX-6] Entidad expuesta: GET /solicitudes/{id}/asignaciones
+    - id           : Long          <<@Id, @GeneratedValue>>
+    ' Sin @Version propio: ciclo de vida controlado por SolicitudAcademica
+    - asignadaEn   : LocalDateTime <<NotNull>>
+    - activa       : Boolean       <<NotNull, default=true>>
+    - notas        : String        <<Nullable, Size(0,500)>>
+    + activar() : void
+    + desactivar() : void
+    + esActiva() : Boolean
+  }
+
+  class HistorialSolicitud {
+    ' Registro inmutable de auditoría (append-only, sin @Version)
+    - id               : Long            <<@Id, @GeneratedValue>>
+    - fechaHora        : LocalDateTime   <<NotNull>>
+    - accionRealizada  : String          <<NotNull>>
+    - estadoAnterior   : EstadoSolicitud <<Nullable>>
+    - estadoNuevo      : EstadoSolicitud <<NotNull>>
+    - observaciones    : String          <<Nullable>>
+    + getResumen() : String
+  }
+
+  class SugerenciaIA {
+    - id                 : Long            <<@Id, @GeneratedValue>>
+    ' Sin @Version: inmutable una vez generada; solo confirmada/ajustada cambia
+    - justificacionIA    : String          <<NotNull>>
+    - confianza          : Double          <<NotNull, Min(0.0), Max(1.0)>>
+    - confirmada         : Boolean         <<NotNull, default=false>>
+    - ajustada           : Boolean         <<NotNull, default=false>>
+    - generadaEn         : LocalDateTime   <<NotNull>>
+    + confirmar() : void
+    + ajustar(tipo: TipoSolicitud, prioridad: NivelPrioridad) : void
+    + fueAceptada() : Boolean
+  }
+
+  ' ── Enumeraciones del agregado ──
+  enum EstadoSolicitud {
+    REGISTRADA
+    CLASIFICADA
+    EN_ATENCION
+    ATENDIDA
+    CERRADA
+    RECHAZADA
+    CANCELADA
+    VENCIDA
+    ESCALADA
+    IMPUGNADA
+    + isFinal() : Boolean  ' CERRADA | RECHAZADA | CANCELADA
+  }
+
+  enum CanalOrigen {
+    CSU
+    CORREO
+    SAC
+    TELEFONICO
+    PRESENCIAL
+    SISTEMA_ACADEMICO
+  }
+
+  enum MotivoRechazo {
+    DUPLICADA
+    INVALIDA
+    FUERA_DE_ALCANCE
+    INFORMACION_INSUFICIENTE
+    PLAZO_VENCIDO
+  }
+}
+
+' ══════════════════════════════════════════════
+' RELACIONES INTER-PAQUETES
+' ══════════════════════════════════════════════
+
+' Solicitud → Tipo (FK: tipoSolicitudId)
+SolicitudAcademica "0..*" --> "1" TipoSolicitud : clasificada como >
+note on link
+  [FIX-14] Si tipoSolicitudId no existe
+  → API retorna 404 NOT_FOUND
+  → Código: TIPO_SOLICITUD_NOT_FOUND
+end note
+
+' Solicitud → Prioridad (Value Object embebido, no FK)
+SolicitudAcademica "1" *-- "0..1" Prioridad : embebida >
+
+' Solicitud → Asignaciones (historial completo)
+SolicitudAcademica "1" o-- "0..*" Asignacion : historial >
+
+' Solicitud → Historial (append-only)
+SolicitudAcademica "1" o-- "1..*" HistorialSolicitud : registra >
+
+' Solicitud → SugerenciaIA (opcional, 1:1)
+SolicitudAcademica "1" --> "0..1" SugerenciaIA : asistida por >
+
+' Asignacion → Usuario (responsable asignado)
+Asignacion "0..*" --> "1" Usuario : responsable >
+note on link
+  [FIX-15] Regla de negocio al asignar:
+  1. Usuario debe existir → 404 si no
+  2. Usuario.activo = true → 422 RESPONSABLE_INACTIVO
+  3. Usuario.roles contiene COORDINADOR
+     o ADMINISTRATIVO → 422 ROL_INSUFICIENTE
+end note
+
+' Asignacion → Usuario (quien asignó)
+Asignacion "0..*" --> "1" Usuario : asignadoPor >
+
+' Historial → Usuario (quien ejecutó la acción)
+HistorialSolicitud "0..*" --> "1" Usuario : ejecutadaPor >
+
+' Solicitud → Usuario (solicitante)
+SolicitudAcademica "0..*" --> "1" Usuario : solicitante >
+
+' SugerenciaIA → TipoSolicitud (FK explícita)
+SugerenciaIA "0..*" --> "1" TipoSolicitud : tipoSugerido >
+SugerenciaIA --> NivelPrioridad : prioridadSugerida >
+
+' ReglaPrioridad puede referenciar TipoSolicitud en su condición (evaluación dinámica)
+ReglaPrioridad ..> SolicitudAcademica : evalúa contexto >
+ReglaPrioridad --> NivelPrioridad
+
+' Enumeraciones
+SolicitudAcademica --> EstadoSolicitud
+SolicitudAcademica --> CanalOrigen
+SolicitudAcademica --> MotivoRechazo
+
+@enduml
