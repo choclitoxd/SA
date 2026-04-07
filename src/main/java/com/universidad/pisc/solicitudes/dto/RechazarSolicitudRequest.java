@@ -1,6 +1,7 @@
 package com.universidad.pisc.solicitudes.dto;
 
-import com.universidad.pisc.solicitudes.model.MotivoRechazo;
+import com.universidad.pisc.solicitudes.enums.MotivoRechazo;
+
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 

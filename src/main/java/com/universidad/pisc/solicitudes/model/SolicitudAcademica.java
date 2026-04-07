@@ -2,6 +2,10 @@ package com.universidad.pisc.solicitudes.model;
 
 import com.universidad.pisc.catalogo.model.TipoSolicitud;
 import com.universidad.pisc.identidad.model.Usuario;
+import com.universidad.pisc.solicitudes.enums.CanalOrigen;
+import com.universidad.pisc.solicitudes.enums.EstadoSolicitud;
+import com.universidad.pisc.solicitudes.enums.MotivoRechazo;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;

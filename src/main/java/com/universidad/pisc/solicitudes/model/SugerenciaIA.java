@@ -1,6 +1,6 @@
 package com.universidad.pisc.solicitudes.model;
 
-import com.universidad.pisc.catalogo.model.NivelPrioridad;
+import com.universidad.pisc.catalogo.enums.NivelPrioridad;
 import com.universidad.pisc.catalogo.model.TipoSolicitud;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

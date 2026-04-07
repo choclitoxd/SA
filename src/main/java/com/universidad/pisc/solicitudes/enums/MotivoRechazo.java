@@ -1,4 +1,4 @@
-package com.universidad.pisc.solicitudes.model;
+package com.universidad.pisc.solicitudes.enums;
 
 public enum MotivoRechazo {
     DUPLICADA,

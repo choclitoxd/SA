@@ -1,7 +1,8 @@
 package com.universidad.pisc.solicitudes.dto;
 
-import com.universidad.pisc.catalogo.model.NivelPrioridad;
-import com.universidad.pisc.solicitudes.model.EstadoSolicitud;
+import com.universidad.pisc.catalogo.enums.NivelPrioridad;
+import com.universidad.pisc.solicitudes.enums.EstadoSolicitud;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 

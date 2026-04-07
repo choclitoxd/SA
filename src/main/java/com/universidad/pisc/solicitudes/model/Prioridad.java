@@ -1,6 +1,5 @@
 package com.universidad.pisc.solicitudes.model;
 
-import com.universidad.pisc.catalogo.model.NivelPrioridad;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.EnumType;
@@ -13,6 +12,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+
+import com.universidad.pisc.catalogo.enums.NivelPrioridad;
 
 /**
  * Value Object que representa la prioridad asignada a una solicitud.

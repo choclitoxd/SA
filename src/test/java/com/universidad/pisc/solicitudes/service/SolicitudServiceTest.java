@@ -1,11 +1,13 @@
 package com.universidad.pisc.solicitudes.service;
 
-import com.universidad.pisc.catalogo.model.NivelPrioridad;
+import com.universidad.pisc.catalogo.enums.NivelPrioridad;
 import com.universidad.pisc.catalogo.model.TipoSolicitud;
 import com.universidad.pisc.catalogo.repository.TipoSolicitudRepository;
 import com.universidad.pisc.identidad.model.Usuario;
 import com.universidad.pisc.identidad.repository.UsuarioRepository;
 import com.universidad.pisc.solicitudes.dto.*;
+import com.universidad.pisc.solicitudes.enums.CanalOrigen;
+import com.universidad.pisc.solicitudes.enums.EstadoSolicitud;
 import com.universidad.pisc.solicitudes.model.*;
 import com.universidad.pisc.solicitudes.repository.AsignacionRepository;
 import com.universidad.pisc.solicitudes.repository.HistorialSolicitudRepository;

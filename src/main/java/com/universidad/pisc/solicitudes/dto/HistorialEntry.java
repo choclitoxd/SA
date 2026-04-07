@@ -1,7 +1,8 @@
 package com.universidad.pisc.solicitudes.dto;
 
 import com.universidad.pisc.identidad.dto.UsuarioResumen;
-import com.universidad.pisc.solicitudes.model.EstadoSolicitud;
+import com.universidad.pisc.solicitudes.enums.EstadoSolicitud;
+
 import java.time.LocalDateTime;
 
 public record HistorialEntry(

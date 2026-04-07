@@ -1,5 +1,7 @@
 package com.universidad.pisc.identidad.model;
 
+import com.universidad.pisc.identidad.enums.NombreRol;
+
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;

@@ -1,6 +1,6 @@
 package com.universidad.pisc.identidad.dto;
 
-import com.universidad.pisc.identidad.model.NombreRol;
+import com.universidad.pisc.identidad.enums.NombreRol;
 import com.universidad.pisc.identidad.model.Rol;
 import com.universidad.pisc.identidad.model.Usuario;
 import org.springframework.stereotype.Component;

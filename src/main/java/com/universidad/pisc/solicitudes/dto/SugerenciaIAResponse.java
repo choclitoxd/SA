@@ -1,7 +1,8 @@
 package com.universidad.pisc.solicitudes.dto;
 
 import com.universidad.pisc.catalogo.dto.TipoSolicitudResponse;
-import com.universidad.pisc.catalogo.model.NivelPrioridad;
+import com.universidad.pisc.catalogo.enums.NivelPrioridad;
+
 import java.time.LocalDateTime;
 
 public record SugerenciaIAResponse(

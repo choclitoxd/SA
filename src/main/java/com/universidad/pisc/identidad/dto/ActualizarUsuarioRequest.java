@@ -1,10 +1,11 @@
 package com.universidad.pisc.identidad.dto;
 
-import com.universidad.pisc.identidad.model.NombreRol;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 import java.util.Set;
+
+import com.universidad.pisc.identidad.enums.NombreRol;
 
 // Para la actualización, los campos no son obligatorios, permitiendo cambios parciales.
 public record ActualizarUsuarioRequest(

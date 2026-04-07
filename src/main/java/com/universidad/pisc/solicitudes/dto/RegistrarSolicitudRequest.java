@@ -1,10 +1,11 @@
 package com.universidad.pisc.solicitudes.dto;
 
-import com.universidad.pisc.solicitudes.model.CanalOrigen;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
+
+import com.universidad.pisc.solicitudes.enums.CanalOrigen;
 
 public record RegistrarSolicitudRequest(
     @NotNull(message = "La descripción es obligatoria")

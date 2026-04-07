@@ -1,8 +1,9 @@
 package com.universidad.pisc.identidad.dto;
 
-import com.universidad.pisc.identidad.model.NombreRol;
 import java.time.LocalDateTime;
 import java.util.Set;
+
+import com.universidad.pisc.identidad.enums.NombreRol;
 
 public record UsuarioResponse(
     Long id,

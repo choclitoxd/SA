@@ -1,6 +1,7 @@
 package com.universidad.pisc.solicitudes.dto;
 
-import com.universidad.pisc.catalogo.model.NivelPrioridad;
+import com.universidad.pisc.catalogo.enums.NivelPrioridad;
+
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 

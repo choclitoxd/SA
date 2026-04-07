@@ -1,5 +1,7 @@
 package com.universidad.pisc.catalogo.model;
 
+import com.universidad.pisc.catalogo.enums.NivelPrioridad;
+
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;

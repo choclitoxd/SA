@@ -1,6 +1,8 @@
 package com.universidad.pisc.solicitudes.model;
 
 import com.universidad.pisc.identidad.model.Usuario;
+import com.universidad.pisc.solicitudes.enums.EstadoSolicitud;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

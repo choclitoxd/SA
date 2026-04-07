@@ -1,4 +1,4 @@
-package com.universidad.pisc.identidad.model;
+package com.universidad.pisc.identidad.enums;
 
 public enum NombreRol {
     ESTUDIANTE,

@@ -2,8 +2,9 @@ package com.universidad.pisc.solicitudes.dto;
 
 import com.universidad.pisc.catalogo.dto.TipoSolicitudResponse;
 import com.universidad.pisc.identidad.dto.UsuarioResumen;
-import com.universidad.pisc.solicitudes.model.CanalOrigen;
-import com.universidad.pisc.solicitudes.model.EstadoSolicitud;
+import com.universidad.pisc.solicitudes.enums.CanalOrigen;
+import com.universidad.pisc.solicitudes.enums.EstadoSolicitud;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
