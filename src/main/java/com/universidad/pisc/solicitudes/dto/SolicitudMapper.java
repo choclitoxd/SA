@@ -1,7 +1,9 @@
 package com.universidad.pisc.solicitudes.dto;
 
 import com.universidad.pisc.catalogo.dto.TipoSolicitudMapper;
+import com.universidad.pisc.catalogo.enums.NivelPrioridad;
 import com.universidad.pisc.identidad.dto.UsuarioMapper;
+import com.universidad.pisc.solicitudes.enums.*;
 import com.universidad.pisc.solicitudes.model.HistorialSolicitud;
 import com.universidad.pisc.solicitudes.model.Prioridad;
 import com.universidad.pisc.solicitudes.model.SolicitudAcademica;

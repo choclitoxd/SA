@@ -6,10 +6,12 @@ import com.universidad.pisc.catalogo.repository.TipoSolicitudRepository;
 import com.universidad.pisc.identidad.model.Usuario;
 import com.universidad.pisc.identidad.repository.UsuarioRepository;
 import com.universidad.pisc.solicitudes.dto.*;
-import com.universidad.pisc.solicitudes.enums.EstadoSolicitud;
+import com.universidad.pisc.solicitudes.enums.*;
 import com.universidad.pisc.solicitudes.model.*;
+import com.universidad.pisc.solicitudes.repository.AsignacionRepository;
 import com.universidad.pisc.solicitudes.repository.HistorialSolicitudRepository;
 import com.universidad.pisc.solicitudes.repository.SolicitudAcademicaRepository;
+import com.universidad.pisc.solicitudes.repository.SugerenciaIARepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -28,6 +30,8 @@ public class SolicitudService {
     private final UsuarioRepository usuarioRepository;
     private final TipoSolicitudRepository tipoSolicitudRepository;
     private final TriageService triageService;
+    private final IAService iaService;
+    private final SugerenciaIARepository sugerenciaIARepository;
     private final SolicitudMapper mapper;
 
     @Transactional
@@ -45,6 +49,9 @@ public class SolicitudService {
 
         SolicitudAcademica guardada = solicitudRepository.save(solicitud);
         
+        // Generar sugerencia de IA automáticamente
+        iaService.generarSugerencia(guardada);
+
         registrarHistorial(guardada, "registrarSolicitud", null, EstadoSolicitud.REGISTRADA, 
                 "Solicitud registrada por el canal " + request.canal(), solicitante);
 
@@ -75,6 +82,17 @@ public class SolicitudService {
                 .orElseThrow(() -> new EntityNotFoundException("Tipo de solicitud no encontrado: " + request.tipoSolicitudId()));
 
         solicitud.setTipo(tipo);
+
+        // Lógica de confirmación de IA
+        if (request.sugerenciaIaId() != null) {
+            SugerenciaIA sugerencia = sugerenciaIARepository.findById(request.sugerenciaIaId())
+                    .orElseThrow(() -> new EntityNotFoundException("Sugerencia de IA no encontrada: " + request.sugerenciaIaId()));
+            
+            sugerencia.setConfirmada(true);
+            // Si el tipo elegido es el mismo que sugirió la IA, se marca como no ajustada
+            sugerencia.setAjustada(!sugerencia.getTipoSugerido().getId().equals(tipo.getId()));
+            sugerenciaIARepository.save(sugerencia);
+        }
 
         Prioridad prioridad;
         String logInfo;
