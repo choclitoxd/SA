@@ -11,7 +11,6 @@ import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.stereotype.Service;
 
-import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -49,35 +48,26 @@ public class TriageService {
     public NivelPrioridad evaluarPrioridad(SolicitudAcademica solicitud) {
         log.debug("Iniciando triage automático para la solicitud: {}", solicitud.getCodigo());
 
-        // Paso 1 y 2: Recuperar y ordenar reglas por relevancia (peso)
-        List<ReglaPrioridad> reglasActivas = reglaRepository.findAll().stream()
-                .filter(ReglaPrioridad::getActiva)
-                .sorted(Comparator.comparing(ReglaPrioridad::getPeso).reversed())
-                .toList();
+        // Recuperar reglas activas ya ordenadas por peso desde la base de datos
+        List<ReglaPrioridad> reglasActivas = reglaRepository.findByActivaTrueOrderByPesoDesc();
 
-        // Paso 3: Crear el contexto de evaluación apuntando al objeto solicitud
-        // Esto permite que las reglas usen campos como 'tipoNombre' o 'diasRestantes'
+        // Crear el contexto de evaluación apuntando al objeto solicitud
         StandardEvaluationContext context = new StandardEvaluationContext(solicitud);
 
         for (ReglaPrioridad regla : reglasActivas) {
             try {
-                // Evaluar la expresión booleana de la regla
+                // Evaluar la expresión booleana de la regla (SpEL)
                 Boolean coincide = parser.parseExpression(regla.getCondicion()).getValue(context, Boolean.class);
                 
                 if (Boolean.TRUE.equals(coincide)) {
-                    log.info("Regla aplicada: '{}' -> Prioridad asignada: {}", 
-                            regla.getNombre(), regla.getNivelResultante());
+                    log.info("Regla aplicada: '{}' -> Prioridad: {}", regla.getNombre(), regla.getNivelResultante());
                     return regla.getNivelResultante();
                 }
             } catch (Exception e) {
-                // Si una regla está mal escrita, se loguea el error y se continúa con la siguiente
-                log.error("Error crítico evaluando la regla '{}': {}", regla.getNombre(), e.getMessage());
+                log.error("Error evaluando la regla '{}': {}", regla.getNombre(), e.getMessage());
             }
         }
 
-        // Paso 4: Valor por defecto si no se cumplen condiciones especiales
-        log.info("No se encontraron reglas coincidentes para la solicitud {}. Asignando prioridad BAJA por defecto.", 
-                solicitud.getCodigo());
         return NivelPrioridad.BAJA;
     }
 }

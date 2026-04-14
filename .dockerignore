@@ -1,8 +1,11 @@
 target/
 .git/
+.gitignore
 .idea/
 .vscode/
 *.puml
 *.yaml
 GEMINI.md
 README.md
+Dockerfile
+apache-maven-3.9.6/

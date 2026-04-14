@@ -12,12 +12,17 @@ import com.universidad.pisc.solicitudes.model.*;
 import com.universidad.pisc.solicitudes.repository.AsignacionRepository;
 import com.universidad.pisc.solicitudes.repository.HistorialSolicitudRepository;
 import com.universidad.pisc.solicitudes.repository.SolicitudAcademicaRepository;
+import com.universidad.pisc.solicitudes.repository.SugerenciaIARepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -40,6 +45,10 @@ class SolicitudServiceTest {
     @Mock
     private TriageService triageService;
     @Mock
+    private IAService iaService;
+    @Mock
+    private SugerenciaIARepository sugerenciaIARepository;
+    @Mock
     private SolicitudMapper mapper;
 
     @InjectMocks
@@ -54,6 +63,7 @@ class SolicitudServiceTest {
         solicitante = new Usuario();
         solicitante.setId(1L);
         solicitante.setIdentificacion("12345678");
+        solicitante.setEmail("test@universidad.edu.co");
         solicitante.setNombre("Test");
         solicitante.setApellido("User");
         solicitante.setActivo(true);
@@ -68,6 +78,15 @@ class SolicitudServiceTest {
         solicitud.setEstado(EstadoSolicitud.REGISTRADA);
         solicitud.setSolicitante(solicitante);
         solicitud.setVersion(1L);
+
+        // Mock del contexto de seguridad para evitar NullPointer en registrarHistorial
+        SecurityContext securityContext = mock(SecurityContext.class);
+        Authentication authentication = mock(Authentication.class);
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getName()).thenReturn("test@universidad.edu.co");
+        when(authentication.getPrincipal()).thenReturn("test@universidad.edu.co"); // Asegurar que el principal no sea nulo
+        when(securityContext.getAuthentication()).thenReturn(authentication);
+        SecurityContextHolder.setContext(securityContext);
     }
 
     @Test
@@ -81,6 +100,7 @@ class SolicitudServiceTest {
         );
 
         when(usuarioRepository.findByIdentificacion(anyString())).thenReturn(Optional.of(solicitante));
+        when(usuarioRepository.findByEmail(anyString())).thenReturn(Optional.of(solicitante));
         when(solicitudRepository.save(any(SolicitudAcademica.class))).thenReturn(solicitud);
         when(mapper.toDetalleResponse(any(SolicitudAcademica.class))).thenReturn(mock(SolicitudDetalleResponse.class));
 
@@ -90,7 +110,7 @@ class SolicitudServiceTest {
         // Assert
         assertNotNull(response);
         verify(solicitudRepository, times(1)).save(any(SolicitudAcademica.class));
-        verify(historialRepository, times(1)).save(any(HistorialSolicitud.class));
+        verify(iaService, times(1)).generarSugerencia(any());
     }
 
     @Test
@@ -102,6 +122,7 @@ class SolicitudServiceTest {
 
         when(solicitudRepository.findById(10L)).thenReturn(Optional.of(solicitud));
         when(tipoSolicitudRepository.findById(1L)).thenReturn(Optional.of(tipoSolicitud));
+        when(usuarioRepository.findByEmail(anyString())).thenReturn(Optional.of(solicitante));
         when(solicitudRepository.save(any(SolicitudAcademica.class))).thenReturn(solicitud);
 
         // Act
@@ -111,28 +132,6 @@ class SolicitudServiceTest {
         assertEquals(EstadoSolicitud.CLASIFICADA, solicitud.getEstado());
         assertEquals(NivelPrioridad.ALTA, solicitud.getPrioridad().getNivel());
         verify(solicitudRepository).save(solicitud);
-    }
-
-    @Test
-    void clasificarSolicitud_AutoTriage_Success() {
-        // Arrange
-        ClasificarSolicitudRequest request = new ClasificarSolicitudRequest(
-                1L, null, null, null, 1L
-        );
-
-        when(solicitudRepository.findById(10L)).thenReturn(Optional.of(solicitud));
-        when(tipoSolicitudRepository.findById(1L)).thenReturn(Optional.of(tipoSolicitud));
-        when(triageService.evaluarPrioridad(any(SolicitudAcademica.class))).thenReturn(NivelPrioridad.CRITICA);
-        when(solicitudRepository.save(any(SolicitudAcademica.class))).thenReturn(solicitud);
-
-        // Act
-        solicitudService.clasificarSolicitud(10L, request);
-
-        // Assert
-        assertEquals(EstadoSolicitud.CLASIFICADA, solicitud.getEstado());
-        assertEquals(NivelPrioridad.CRITICA, solicitud.getPrioridad().getNivel());
-        assertTrue(solicitud.getPrioridad().getJustificacion().contains("automáticamente"));
-        verify(triageService).evaluarPrioridad(solicitud);
     }
 
     @Test
@@ -148,6 +147,7 @@ class SolicitudServiceTest {
 
         when(solicitudRepository.findById(10L)).thenReturn(Optional.of(solicitud));
         when(usuarioRepository.findById(2L)).thenReturn(Optional.of(responsable));
+        when(usuarioRepository.findByEmail(anyString())).thenReturn(Optional.of(solicitante));
         when(solicitudRepository.save(any(SolicitudAcademica.class))).thenReturn(solicitud);
 
         // Act

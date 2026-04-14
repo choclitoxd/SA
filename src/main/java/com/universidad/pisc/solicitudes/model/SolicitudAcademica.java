@@ -29,13 +29,18 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.springframework.data.annotation.CreatedBy;
+import org.springframework.data.annotation.LastModifiedBy;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import jakarta.persistence.EntityListeners;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Table(name = "solicitudes")
+@EntityListeners(AuditingEntityListener.class)
 @Getter
 @Setter
 public class SolicitudAcademica {
@@ -46,6 +51,13 @@ public class SolicitudAcademica {
 
     @Version
     private Long version;
+
+    @CreatedBy
+    @Column(updatable = false)
+    private String creadoPor;
+
+    @LastModifiedBy
+    private String actualizadoPor;
 
     @Column(nullable = false, unique = true, updatable = false, length = 30)
     private String codigo;
