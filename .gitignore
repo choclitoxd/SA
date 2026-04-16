@@ -19,5 +19,13 @@ target/
 .DS_Store
 Thumbs.db
 
+# Secrets and Environment
+.env
+.env.local
+.env.*.local
+*.p12
+*.pem
+*.jks
+
 # Project specific
 GEMINI.md
