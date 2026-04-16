@@ -92,7 +92,7 @@ El contrato OpenAPI (Swagger) se encuentra en `openapi-solicitudes-academicas.ya
 - [x] **Ciclo de Vida de Solicitudes:** Completado.
 - [x] **Motor de Triage (Reglas):** Completado.
 - [x] **Integración IA (Gemini):** Completado.
-- [ ] **Auditoría Avanzada:** En desarrollo.
+- [x] **Auditoría Avanzada:** En desarrollo.
 
 ---
 Desarrollado para el Programa de Ingeniería de Sistemas y Computación (PISC).
