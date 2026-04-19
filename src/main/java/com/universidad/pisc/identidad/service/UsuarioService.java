@@ -30,9 +30,17 @@ public class UsuarioService {
 
     @Transactional
     public UsuarioResponse crearUsuario(CrearUsuarioRequest request) {
-        // Se podría añadir lógica para verificar duplicados de email/identificación y lanzar un error 409 (Conflict).
-        Usuario usuario = mapper.toEntity(request);
+        // Validar duplicados de Email
+        if (usuarioRepository.findByEmail(request.email()).isPresent()) {
+            throw new IllegalStateException("Ya existe un usuario registrado con el email: " + request.email());
+        }
+        
+        // Validar duplicados de Identificación
+        if (usuarioRepository.findByIdentificacion(request.identificacion()).isPresent()) {
+            throw new IllegalStateException("Ya existe un usuario registrado con la identificación: " + request.identificacion());
+        }
 
+        Usuario usuario = mapper.toEntity(request);
         usuario.setPasswordHash(passwordEncoder.encode(request.password()));
 
         Set<Rol> roles = request.roles().stream()
@@ -68,7 +76,10 @@ public class UsuarioService {
         if (request.apellido() != null) {
             usuario.setApellido(request.apellido());
         }
-        if (request.email() != null) {
+        if (request.email() != null && !request.email().equalsIgnoreCase(usuario.getEmail())) {
+            if (usuarioRepository.findByEmail(request.email()).isPresent()) {
+                throw new IllegalStateException("No se puede actualizar: el email " + request.email() + " ya está en uso por otro usuario.");
+            }
             usuario.setEmail(request.email());
         }
         if (request.roles() != null && !request.roles().isEmpty()) {

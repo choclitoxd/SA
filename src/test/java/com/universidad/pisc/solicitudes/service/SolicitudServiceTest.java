@@ -10,7 +10,6 @@ import com.universidad.pisc.solicitudes.enums.CanalOrigen;
 import com.universidad.pisc.solicitudes.enums.EstadoSolicitud;
 import com.universidad.pisc.solicitudes.model.*;
 import com.universidad.pisc.solicitudes.repository.AsignacionRepository;
-import com.universidad.pisc.solicitudes.repository.HistorialSolicitudRepository;
 import com.universidad.pisc.solicitudes.repository.SolicitudAcademicaRepository;
 import com.universidad.pisc.solicitudes.repository.SugerenciaIARepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,10 +18,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
-
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -35,7 +30,7 @@ class SolicitudServiceTest {
     @Mock
     private SolicitudAcademicaRepository solicitudRepository;
     @Mock
-    private HistorialSolicitudRepository historialRepository;
+    private SolicitudHistorialService historialService;
     @Mock
     private AsignacionRepository asignacionRepository;
     @Mock
@@ -45,7 +40,7 @@ class SolicitudServiceTest {
     @Mock
     private TriageService triageService;
     @Mock
-    private IAService iaService;
+    private SolicitudClasificador clasificadorIA;
     @Mock
     private SugerenciaIARepository sugerenciaIARepository;
     @Mock
@@ -78,15 +73,6 @@ class SolicitudServiceTest {
         solicitud.setEstado(EstadoSolicitud.REGISTRADA);
         solicitud.setSolicitante(solicitante);
         solicitud.setVersion(1L);
-
-        // Mock del contexto de seguridad para evitar NullPointer en registrarHistorial
-        SecurityContext securityContext = mock(SecurityContext.class);
-        Authentication authentication = mock(Authentication.class);
-        when(authentication.isAuthenticated()).thenReturn(true);
-        when(authentication.getName()).thenReturn("test@universidad.edu.co");
-        when(authentication.getPrincipal()).thenReturn("test@universidad.edu.co"); // Asegurar que el principal no sea nulo
-        when(securityContext.getAuthentication()).thenReturn(authentication);
-        SecurityContextHolder.setContext(securityContext);
     }
 
     @Test
@@ -100,7 +86,6 @@ class SolicitudServiceTest {
         );
 
         when(usuarioRepository.findByIdentificacion(anyString())).thenReturn(Optional.of(solicitante));
-        when(usuarioRepository.findByEmail(anyString())).thenReturn(Optional.of(solicitante));
         when(solicitudRepository.save(any(SolicitudAcademica.class))).thenReturn(solicitud);
         when(mapper.toDetalleResponse(any(SolicitudAcademica.class))).thenReturn(mock(SolicitudDetalleResponse.class));
 
@@ -110,7 +95,8 @@ class SolicitudServiceTest {
         // Assert
         assertNotNull(response);
         verify(solicitudRepository, times(1)).save(any(SolicitudAcademica.class));
-        verify(iaService, times(1)).generarSugerencia(any());
+        verify(clasificadorIA, times(1)).generarSugerencia(any());
+        verify(historialService, times(1)).registrarEvento(any(), anyString(), any(), any(), anyString());
     }
 
     @Test
@@ -122,7 +108,6 @@ class SolicitudServiceTest {
 
         when(solicitudRepository.findById(10L)).thenReturn(Optional.of(solicitud));
         when(tipoSolicitudRepository.findById(1L)).thenReturn(Optional.of(tipoSolicitud));
-        when(usuarioRepository.findByEmail(anyString())).thenReturn(Optional.of(solicitante));
         when(solicitudRepository.save(any(SolicitudAcademica.class))).thenReturn(solicitud);
 
         // Act
@@ -132,6 +117,7 @@ class SolicitudServiceTest {
         assertEquals(EstadoSolicitud.CLASIFICADA, solicitud.getEstado());
         assertEquals(NivelPrioridad.ALTA, solicitud.getPrioridad().getNivel());
         verify(solicitudRepository).save(solicitud);
+        verify(historialService, times(1)).registrarEvento(any(), anyString(), any(), any(), anyString());
     }
 
     @Test
@@ -147,8 +133,8 @@ class SolicitudServiceTest {
 
         when(solicitudRepository.findById(10L)).thenReturn(Optional.of(solicitud));
         when(usuarioRepository.findById(2L)).thenReturn(Optional.of(responsable));
-        when(usuarioRepository.findByEmail(anyString())).thenReturn(Optional.of(solicitante));
         when(solicitudRepository.save(any(SolicitudAcademica.class))).thenReturn(solicitud);
+        when(historialService.obtenerUsuarioActualParaAsignacion(any())).thenReturn(solicitante);
 
         // Act
         solicitudService.asignarResponsable(10L, request);
@@ -158,5 +144,6 @@ class SolicitudServiceTest {
         assertFalse(solicitud.getAsignaciones().isEmpty());
         assertEquals(responsable, solicitud.getAsignaciones().get(0).getResponsable());
         verify(solicitudRepository).save(solicitud);
+        verify(historialService, times(1)).registrarEvento(any(), anyString(), any(), any(), anyString());
     }
 }

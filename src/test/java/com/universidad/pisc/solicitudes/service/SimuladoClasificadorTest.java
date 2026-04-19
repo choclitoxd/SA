@@ -12,7 +12,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
@@ -21,7 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class IAServiceTest {
+class SimuladoClasificadorTest {
 
     @Mock
     private TipoSolicitudRepository tipoRepository;
@@ -33,28 +32,22 @@ class IAServiceTest {
     private TriageService triageService;
 
     @InjectMocks
-    private IAService iaService;
+    private SimuladoClasificador simuladoClasificador;
 
     private SolicitudAcademica solicitud;
     private TipoSolicitud tipo;
 
     @BeforeEach
     void setUp() {
-        // Configurar una solicitud de ejemplo
         solicitud = new SolicitudAcademica();
         solicitud.setCodigo("SOL-001");
         solicitud.setDescripcion("Necesito cancelar una materia por motivos de salud.");
 
-        // Configurar un tipo de solicitud de ejemplo
         tipo = new TipoSolicitud();
         tipo.setId(1L);
-        tipo.setNombre("Cancelación de Materia");
+        tipo.setNombre("Cancelacion");
         tipo.setDescripcion("Proceso para dar de baja una asignatura.");
         tipo.setActivo(true);
-
-        // Inyectar manualmente la API Key como "NO_KEY" para forzar el modo simulado en el test
-        ReflectionTestUtils.setField(iaService, "apiKey", "NO_KEY");
-        iaService.init();
     }
 
     @Test
@@ -65,13 +58,13 @@ class IAServiceTest {
         when(sugerenciaRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // WHEN
-        SugerenciaIA resultado = iaService.generarSugerencia(solicitud);
+        SugerenciaIA resultado = simuladoClasificador.generarSugerencia(solicitud);
 
         // THEN
         assertNotNull(resultado);
         assertEquals(tipo, resultado.getTipoSugerido());
         assertEquals(NivelPrioridad.MEDIA, resultado.getPrioridadSugerida());
-        assertTrue(resultado.getJustificacionIA().contains("Simulación"));
+        assertTrue(resultado.getJustificacionIA().contains("SOLID Simulado"));
         verify(sugerenciaRepository, times(1)).save(any());
     }
 
@@ -81,7 +74,7 @@ class IAServiceTest {
         when(tipoRepository.findByActivo(true)).thenReturn(List.of());
 
         // WHEN
-        SugerenciaIA resultado = iaService.generarSugerencia(solicitud);
+        SugerenciaIA resultado = simuladoClasificador.generarSugerencia(solicitud);
 
         // THEN
         assertNull(resultado);
