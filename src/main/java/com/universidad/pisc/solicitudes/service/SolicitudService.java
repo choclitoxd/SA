@@ -48,11 +48,15 @@ public class SolicitudService {
 
         SolicitudAcademica guardada = solicitudRepository.save(solicitud);
         
-        // Generar sugerencia de IA automáticamente
-        iaService.generarSugerencia(guardada);
+        // Generar sugerencia de IA y asociarla al objeto en memoria
+        SugerenciaIA sugerencia = iaService.generarSugerencia(guardada);
+        guardada.setSugerenciaIA(sugerencia);
 
         registrarHistorial(guardada, "registrarSolicitud", null, EstadoSolicitud.REGISTRADA, 
                 "Solicitud registrada por el canal " + request.canal());
+
+        // Forzar flush para que la versión aumente antes de mapear al DTO
+        solicitudRepository.flush();
 
         return mapper.toDetalleResponse(guardada);
     }

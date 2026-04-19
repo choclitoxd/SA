@@ -51,6 +51,7 @@ public class TipoSolicitudService {
         tipoExistente.setNombre(request.nombre());
         tipoExistente.setDescripcion(request.descripcion());
         tipoExistente.setTiempoAtencionDias(request.tiempoAtencionDias());
+        tipoExistente.setCategoria(request.categoria()); // Aseguramos que la categoría también se actualice
 
         TipoSolicitud actualizado = repository.save(tipoExistente);
         return mapper.toResponse(actualizado);

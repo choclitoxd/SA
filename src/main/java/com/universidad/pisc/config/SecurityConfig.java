@@ -22,26 +22,27 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                // Endpoints de Gestión de Usuarios (Solo ADMIN)
-                .requestMatchers("/usuarios/**").hasRole("ADMIN")
+                // Endpoints de Gestión de Usuarios (Solo ADMINISTRATIVO)
+                .requestMatchers("/usuarios/**").hasRole("ADMINISTRATIVO")
                 
-                // Endpoints de Catálogo (ADMIN y COORDINADOR)
-                .requestMatchers("/tipos-solicitud/**").hasAnyRole("ADMIN", "COORDINADOR")
+                // Endpoints de Catálogo y Reglas (ADMINISTRATIVO y COORDINADOR)
+                .requestMatchers("/tipos-solicitud/**").hasAnyRole("ADMINISTRATIVO", "COORDINADOR")
+                .requestMatchers("/reglas-prioridad/**").hasAnyRole("ADMINISTRATIVO", "COORDINADOR")
                 
                 // Endpoints de Solicitudes (Acceso según acción)
-                .requestMatchers(org.springframework.http.HttpMethod.POST, "/solicitudes").hasAnyRole("ESTUDIANTE", "ADMIN")
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/solicitudes").hasAnyRole("ESTUDIANTE", "ADMINISTRATIVO")
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/solicitudes/**").authenticated()
-                .requestMatchers("/solicitudes/{id}/clasificar").hasAnyRole("COORDINADOR", "ADMIN")
-                .requestMatchers("/solicitudes/{id}/asignar").hasAnyRole("COORDINADOR", "ADMIN")
-                .requestMatchers("/solicitudes/{id}/atender").hasAnyRole("ADMIN", "DOCENTE") // DOCENTE puede ser el responsable
-                .requestMatchers("/solicitudes/{id}/cerrar").hasAnyRole("ESTUDIANTE", "ADMIN")
+                .requestMatchers("/solicitudes/{id}/clasificar").hasAnyRole("COORDINADOR", "ADMINISTRATIVO")
+                .requestMatchers("/solicitudes/{id}/asignar").hasAnyRole("COORDINADOR", "ADMINISTRATIVO")
+                .requestMatchers("/solicitudes/{id}/atender").hasAnyRole("ADMINISTRATIVO", "DIRECTOR", "COORDINADOR")
+                .requestMatchers("/solicitudes/{id}/cerrar").hasAnyRole("ESTUDIANTE", "ADMINISTRATIVO")
                 
                 // Permitir acceso a H2 Console y Swagger si es necesario para desarrollo
                 .requestMatchers("/h2-console/**").permitAll()
                 .anyRequest().authenticated()
             )
-            .headers(headers -> headers.frameOptions(frame -> frame.disable())) // Para H2 Console
-            .httpBasic(org.springframework.security.config.Customizer.withDefaults()); // Autenticación básica para pruebas
+            .headers(headers -> headers.frameOptions(frame -> frame.disable()))
+            .httpBasic(org.springframework.security.config.Customizer.withDefaults());
         return http.build();
     }
 }
