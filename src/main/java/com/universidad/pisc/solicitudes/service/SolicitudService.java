@@ -19,6 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
+/**
+ * Orquestador del ciclo de vida de solicitudes académicas.
+ * Gestiona la coordinación entre el dominio, persistencia y servicios de apoyo (IA/Triage).
+ */
 @Service
 @RequiredArgsConstructor
 public class SolicitudService {
@@ -32,8 +36,13 @@ public class SolicitudService {
     private final SugerenciaIARepository sugerenciaIARepository;
     private final SolicitudMapper mapper;
 
+    /**
+     * Registra una nueva solicitud en el sistema y dispara la clasificación sugerida por IA.
+     * @return Detalle de la solicitud con el código generado y sugerencia de IA inicial.
+     */
     @Transactional
     public SolicitudDetalleResponse registrarSolicitud(RegistrarSolicitudRequest request) {
+        // ... (resto del código igual)
         Usuario solicitante = usuarioRepository.findByIdentificacion(request.solicitanteId())
                 .orElseThrow(() -> new EntityNotFoundException("Solicitante no encontrado con identificación: " + request.solicitanteId()));
 
@@ -58,28 +67,34 @@ public class SolicitudService {
         return mapper.toDetalleResponse(guardada);
     }
 
+    /**
+     * Recupera el detalle completo de una solicitud por su ID.
+     */
     @Transactional(readOnly = true)
     public SolicitudDetalleResponse obtenerSolicitud(Long id) {
-        return solicitudRepository.findById(id)
-                .map(mapper::toDetalleResponse)
-                .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada con id: " + id));
+        return mapper.toDetalleResponse(obtenerEntidad(id));
     }
 
+    /**
+        * Lista solicitudes de forma paginada para la vista de resumen.
+    */
     @Transactional(readOnly = true)
     public Page<SolicitudResumen> listarSolicitudes(Pageable pageable) {
-        return solicitudRepository.findAll(pageable).map(mapper::toResumen);
+        return solicitudRepository.findAll(pageable)
+                .map(mapper::toResumen);
     }
 
+    /**
+        * Ejecuta la transición a CLASIFICADA asignando tipo y prioridad (manual o vía motor de reglas).
+    */
     @Transactional
     public SolicitudDetalleResponse clasificarSolicitud(Long id, ClasificarSolicitudRequest request) {
+        // ... (resto del código igual)
         SolicitudAcademica solicitud = obtenerEntidad(id);
         validarVersion(solicitud, request.version());
-        validarEstado(solicitud, EstadoSolicitud.REGISTRADA);
 
         TipoSolicitud tipo = tipoSolicitudRepository.findById(request.tipoSolicitudId())
                 .orElseThrow(() -> new EntityNotFoundException("Tipo de solicitud no encontrado: " + request.tipoSolicitudId()));
-
-        solicitud.setTipo(tipo);
 
         if (request.sugerenciaIaId() != null) {
             SugerenciaIA sugerencia = sugerenciaIARepository.findById(request.sugerenciaIaId())
@@ -100,8 +115,7 @@ public class SolicitudService {
             logInfo = "Clasificada automáticamente como " + tipo.getNombre();
         }
         
-        solicitud.setPrioridad(prioridad);
-        solicitud.setEstado(EstadoSolicitud.CLASIFICADA);
+        solicitud.clasificar(tipo, prioridad);
         
         SolicitudAcademica actualizada = solicitudRepository.save(solicitud);
         historialService.registrarEvento(actualizada, "clasificarSolicitud", EstadoSolicitud.REGISTRADA, EstadoSolicitud.CLASIFICADA, logInfo);
@@ -109,16 +123,21 @@ public class SolicitudService {
         return mapper.toDetalleResponse(actualizada);
     }
 
+    /**
+     * Asigna un responsable y mueve la solicitud a EN_ATENCION, gestionando la trazabilidad de asignaciones.
+     */
     @Transactional
     public SolicitudDetalleResponse asignarResponsable(Long id, AsignarResponsableRequest request) {
+        // ... (resto del código igual)
         SolicitudAcademica solicitud = obtenerEntidad(id);
         validarVersion(solicitud, request.version());
-        validarEstado(solicitud, EstadoSolicitud.CLASIFICADA, EstadoSolicitud.EN_ATENCION);
 
         EstadoSolicitud estadoAnterior = solicitud.getEstado();
         Usuario responsable = usuarioRepository.findById(request.responsableId())
                 .orElseThrow(() -> new EntityNotFoundException("Responsable no encontrado"));
 
+        solicitud.asignar(responsable);
+        
         solicitud.getAsignaciones().forEach(a -> a.setActiva(false));
 
         Asignacion nuevaAsignacion = new Asignacion();
@@ -128,7 +147,6 @@ public class SolicitudService {
         nuevaAsignacion.setNotas(request.notas());
         
         solicitud.getAsignaciones().add(nuevaAsignacion);
-        solicitud.setEstado(EstadoSolicitud.EN_ATENCION);
 
         SolicitudAcademica actualizada = solicitudRepository.save(solicitud);
         historialService.registrarEvento(actualizada, "asignarResponsable", estadoAnterior, EstadoSolicitud.EN_ATENCION, 
@@ -137,14 +155,16 @@ public class SolicitudService {
         return mapper.toDetalleResponse(actualizada);
     }
 
+    /**
+     * Registra la solución técnica de la solicitud. Requiere estado EN_ATENCION.
+     */
     @Transactional
     public SolicitudDetalleResponse marcarAtendida(Long id, MarcarAtendidaRequest request) {
+        // ... (resto del código igual)
         SolicitudAcademica solicitud = obtenerEntidad(id);
         validarVersion(solicitud, request.version());
-        validarEstado(solicitud, EstadoSolicitud.EN_ATENCION);
 
-        solicitud.setObservacionResolucion(request.observacionResolucion());
-        solicitud.setEstado(EstadoSolicitud.ATENDIDA);
+        solicitud.marcarAtendida(request.observacionResolucion());
 
         SolicitudAcademica actualizada = solicitudRepository.save(solicitud);
         historialService.registrarEvento(actualizada, "marcarAtendida", EstadoSolicitud.EN_ATENCION, EstadoSolicitud.ATENDIDA, 
@@ -153,14 +173,16 @@ public class SolicitudService {
         return mapper.toDetalleResponse(actualizada);
     }
 
+    /**
+     * Cierre formal de la solicitud tras validación de la atención. Bloquea cambios posteriores.
+     */
     @Transactional
     public SolicitudDetalleResponse cerrarSolicitud(Long id, CerrarSolicitudRequest request) {
+        // ... (resto del código igual)
         SolicitudAcademica solicitud = obtenerEntidad(id);
         validarVersion(solicitud, request.version());
-        validarEstado(solicitud, EstadoSolicitud.ATENDIDA);
 
-        solicitud.setObservacionCierre(request.observacionCierre());
-        solicitud.setEstado(EstadoSolicitud.CERRADA);
+        solicitud.cerrar(request.observacionCierre());
 
         SolicitudAcademica actualizada = solicitudRepository.save(solicitud);
         historialService.registrarEvento(actualizada, "cerrarSolicitud", EstadoSolicitud.ATENDIDA, EstadoSolicitud.CERRADA, 
@@ -169,16 +191,17 @@ public class SolicitudService {
         return mapper.toDetalleResponse(actualizada);
     }
 
+    /**
+     * Cancela la solicitud registrando el motivo administrativo del rechazo.
+     */
     @Transactional
     public SolicitudDetalleResponse rechazarSolicitud(Long id, RechazarSolicitudRequest request) {
+        // ... (resto del código igual)
         SolicitudAcademica solicitud = obtenerEntidad(id);
         validarVersion(solicitud, request.version());
-        validarEstado(solicitud, EstadoSolicitud.REGISTRADA, EstadoSolicitud.CLASIFICADA);
 
         EstadoSolicitud estadoAnterior = solicitud.getEstado();
-        solicitud.setMotivoRechazo(request.motivo());
-        solicitud.setObservacionResolucion(request.justificacion());
-        solicitud.setEstado(EstadoSolicitud.RECHAZADA);
+        solicitud.rechazar(request.motivo(), request.justificacion());
 
         SolicitudAcademica actualizada = solicitudRepository.save(solicitud);
         historialService.registrarEvento(actualizada, "rechazarSolicitud", estadoAnterior, EstadoSolicitud.RECHAZADA, 
@@ -192,16 +215,13 @@ public class SolicitudService {
                 .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada con id: " + id));
     }
 
+    /**
+     * Garantiza la integridad de datos mediante bloqueo optimista.
+     * @throws BusinessException si la versión del cliente es obsoleta (HTTP 409).
+     */
     private void validarVersion(SolicitudAcademica solicitud, Long version) {
         if (!solicitud.getVersion().equals(version)) {
-            throw new IllegalStateException("Conflicto de concurrencia: la versión proporcionada no coincide");
-        }
-    }
-
-    private void validarEstado(SolicitudAcademica solicitud, EstadoSolicitud... estadosPermitidos) {
-        java.util.EnumSet<EstadoSolicitud> permits = java.util.EnumSet.of(estadosPermitidos[0], estadosPermitidos);
-        if (!permits.contains(solicitud.getEstado())) {
-            throw new IllegalStateException("Transición de estado no permitida desde: " + solicitud.getEstado());
+            throw new com.universidad.pisc.config.BusinessException("Conflicto de concurrencia: la solicitud fue modificada por otro usuario.", org.springframework.http.HttpStatus.CONFLICT);
         }
     }
 }
