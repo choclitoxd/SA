@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 
 /**
  * Implementación de clasificación usando Google Gemini.
+ * Utiliza modelos de lenguaje para categorizar semánticamente las solicitudes académicas.
  */
 @Slf4j
 @Service
@@ -36,6 +37,9 @@ public class GeminiClasificador implements SolicitudClasificador {
 
     private ChatLanguageModel model;
 
+    /**
+     * Inicializa el cliente de Gemini validando la presencia de la API Key.
+     */
     @PostConstruct
     public void init() {
         if (apiKey == null || apiKey.isEmpty() || apiKey.contains("TU_API_KEY")) {
@@ -44,40 +48,76 @@ public class GeminiClasificador implements SolicitudClasificador {
         } else {
             this.model = GoogleAiGeminiChatModel.builder()
                     .apiKey(apiKey.trim())
-                    .modelName("gemini-1.5-flash")
+                    .modelName("gemini-2.5-flash") // Modelo estable confirmado para 2026
                     .logRequestsAndResponses(true)
                     .build();
         }
     }
 
+    /**
+     * Genera una sugerencia inteligente basada en la descripción. 
+     * Implementa fallback automático a palabras clave si el modelo falla.
+     */
     @Override
     @Transactional
     public SugerenciaIA generarSugerencia(SolicitudAcademica solicitud) {
-        if (model == null) return null;
-
-        List<TipoSolicitud> tiposActivos = tipoRepository.findByActivo(true);
-        if (tiposActivos.isEmpty()) return null;
-
         try {
-            String listaTipos = tiposActivos.stream()
-                    .map(t -> "- " + t.getNombre() + ": " + t.getDescripcion())
-                    .collect(Collectors.joining("\n"));
+            if (model != null) {
+                List<TipoSolicitud> tiposActivos = tipoRepository.findByActivo(true);
+                if (!tiposActivos.isEmpty()) {
+                    String listaTipos = tiposActivos.stream()
+                            .map(t -> "- " + t.getNombre() + ": " + t.getDescripcion())
+                            .collect(Collectors.joining("\n"));
 
-            String prompt = String.format(
-                    "Eres un experto académico. Clasifica esta solicitud:\n\"%s\"\n\n" +
-                    "Tipos:\n%s\n\nResponde exactamente:\nTIPO: [Nombre]\nJUSTIFICACIÓN: [Breve]",
-                    solicitud.getDescripcion(), listaTipos
-            );
+                    String prompt = String.format(
+                            "Eres un experto académico. Clasifica esta solicitud:\n\"%s\"\n\n" +
+                            "Tipos:\n%s\n\nResponde exactamente:\nTIPO: [Nombre]\nJUSTIFICACIÓN: [Breve]",
+                            solicitud.getDescripcion(), listaTipos
+                    );
 
-            String response = model.generate(prompt);
-            return procesarRespuestaIA(response, solicitud, tiposActivos);
+                    String response = model.generate(prompt);
+                    return procesarRespuestaIA(response, solicitud, tiposActivos);
+                }
+            }
         } catch (Exception e) {
-            log.error("Error en Gemini: {}", e.getMessage());
-            return null;
+            log.error("Error en Gemini: {}. Activando fallback simulado.", e.getMessage());
         }
+
+        return generarSugerenciaFallback(solicitud);
     }
 
+    /**
+     * Clasificación de contingencia basada en coincidencia de términos exactos.
+     */
+    private SugerenciaIA generarSugerenciaFallback(SolicitudAcademica solicitud) {
+        log.info("Generando sugerencia por fallback (Palabras clave)");
+        List<TipoSolicitud> tipos = tipoRepository.findByActivo(true);
+        if (tipos.isEmpty()) return null;
+
+        TipoSolicitud sugerido = tipos.get(0);
+        String desc = solicitud.getDescripcion().toLowerCase();
+        for (TipoSolicitud t : tipos) {
+            if (desc.contains(t.getNombre().toLowerCase())) {
+                sugerido = t;
+                break;
+            }
+        }
+
+        SugerenciaIA sugerencia = new SugerenciaIA();
+        sugerencia.setSolicitud(solicitud);
+        sugerencia.setTipoSugerido(sugerido);
+        sugerencia.setPrioridadSugerida(triageService.evaluarPrioridad(solicitud));
+        sugerencia.setConfianza(0.50);
+        sugerencia.setJustificacionIA("Clasificación por palabras clave (Fallback: Gemini no disponible).");
+
+        return sugerenciaRepository.save(sugerencia);
+    }
+
+    /**
+     * Parsea la respuesta estructurada del LLM y la vincula con los tipos del catálogo.
+     */
     private SugerenciaIA procesarRespuestaIA(String response, SolicitudAcademica solicitud, List<TipoSolicitud> tipos) {
+
         String tipoNombre = extraerValor(response, "TIPO:");
         String justificacion = extraerValor(response, "JUSTIFICACIÓN:");
 

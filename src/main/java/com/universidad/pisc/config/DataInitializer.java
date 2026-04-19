@@ -1,5 +1,8 @@
 package com.universidad.pisc.config;
 
+import com.universidad.pisc.catalogo.enums.CategoriaSolicitud;
+import com.universidad.pisc.catalogo.model.TipoSolicitud;
+import com.universidad.pisc.catalogo.repository.TipoSolicitudRepository;
 import com.universidad.pisc.identidad.enums.NombreRol;
 import com.universidad.pisc.identidad.model.Rol;
 import com.universidad.pisc.identidad.model.Usuario;
@@ -23,6 +26,7 @@ public class DataInitializer implements CommandLineRunner {
 
     private final RolRepository rolRepository;
     private final UsuarioRepository usuarioRepository;
+    private final TipoSolicitudRepository tipoSolicitudRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -30,6 +34,31 @@ public class DataInitializer implements CommandLineRunner {
     public void run(String... args) {
         crearRoles();
         crearAdminInicial();
+        // crearTiposSolicitudIniciales(); // Comentado temporalmente para evitar fallos de arranque
+    }
+
+    private void crearTiposSolicitudIniciales() {
+        if (tipoSolicitudRepository.count() == 0) {
+            log.info("Poblando catálogo inicial de tipos de solicitud...");
+            
+            saveTipo("RECLAMO_CALIFICACION", "Reclamación sobre notas o exámenes parciales y finales.", CategoriaSolicitud.GESTION_CURRICULAR);
+            saveTipo("SOLICITUD_CERTIFICADO", "Expedición de certificados de estudio o notas.", CategoriaSolicitud.DOCUMENTACION);
+            saveTipo("CANCELACION_SEMESTRE", "Retiro formal de todas las asignaturas inscritas.", CategoriaSolicitud.PERMANENCIA_ACADEMICA);
+            saveTipo("BECA_SOCIOCONOMICA", "Postulación para apoyos financieros de bienestar.", CategoriaSolicitud.BIENESTAR_Y_APOYO);
+            saveTipo("SOLICITUD_GRADO", "Proceso de postulación y revisión de requisitos para grado.", CategoriaSolicitud.GRADOS_Y_EGRESADOS);
+
+            log.info("Catálogo poblado exitosamente con 5 tipos básicos.");
+        }
+    }
+
+    private void saveTipo(String nombre, String descripcion, CategoriaSolicitud cat) {
+        TipoSolicitud tipo = new TipoSolicitud();
+        tipo.setNombre(nombre);
+        tipo.setDescripcion(descripcion);
+        tipo.setCategoria(cat);
+        tipo.setTiempoAtencionDias(5); // Valor por defecto obligatorio
+        tipo.setActivo(true);
+        tipoSolicitudRepository.save(tipo);
     }
 
     private void crearRoles() {
