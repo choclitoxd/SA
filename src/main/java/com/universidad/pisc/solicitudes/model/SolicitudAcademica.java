@@ -1,6 +1,7 @@
 package com.universidad.pisc.solicitudes.model;
 
 import com.universidad.pisc.catalogo.model.TipoSolicitud;
+import com.universidad.pisc.config.BusinessException;
 import com.universidad.pisc.identidad.model.Usuario;
 import com.universidad.pisc.solicitudes.enums.CanalOrigen;
 import com.universidad.pisc.solicitudes.enums.EstadoSolicitud;
@@ -129,6 +130,74 @@ public class SolicitudAcademica {
     @OneToOne(mappedBy = "solicitud", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private SugerenciaIA sugerenciaIA;
 
+    // --- Comportamiento de Dominio (Transiciones de Estado) ---
+    /**
+        * Valida y ejecuta el cambio a estado CLASIFICADA asignando tipo y prioridad. */
+    public void clasificar(TipoSolicitud tipo, Prioridad prioridad) {
+        validarEstado(EstadoSolicitud.REGISTRADA);
+        this.tipo = tipo;
+        this.prioridad = prioridad;
+        this.estado = EstadoSolicitud.CLASIFICADA;
+    }
+     /**
+        * Transiciona la solicitud a EN_ATENCION al asignar un responsable.
+    */
+    public void asignar(Usuario responsable) {
+        validarEstado(EstadoSolicitud.CLASIFICADA, EstadoSolicitud.EN_ATENCION);
+        this.estado = EstadoSolicitud.EN_ATENCION;
+    }
+    /**
+        * Registra la solución técnica y mueve la solicitud a estado ATENDIDA.
+        * @throws BusinessException si la resolución es demasiado breve.
+    */
+    public void marcarAtendida(String resolucion) {
+        validarEstado(EstadoSolicitud.EN_ATENCION);
+        if (resolucion == null || resolucion.trim().length() < 20) {
+            throw new com.universidad.pisc.config.BusinessException("La resolución debe tener al menos 20 caracteres.");
+        }
+        this.observacionResolucion = resolucion;
+        this.estado = EstadoSolicitud.ATENDIDA;
+    }
+    /**
+        * Finaliza el ciclo de vida de la solicitud tras la conformidad del cierre.
+    */
+    public void cerrar(String observacion) {
+        validarEstado(EstadoSolicitud.ATENDIDA);
+        if (observacion == null || observacion.trim().length() < 20) {
+            throw new com.universidad.pisc.config.BusinessException("La observación de cierre debe tener al menos 20 caracteres.");
+        }
+        this.observacionCierre = observacion;
+        this.estado = EstadoSolicitud.CERRADA;
+    }
+    /**
+        * Cancela el proceso de la solicitud por motivos administrativos o falta de requisitos.  
+    */
+    public void rechazar(MotivoRechazo motivo, String justificacion) {
+        validarEstado(EstadoSolicitud.REGISTRADA, EstadoSolicitud.CLASIFICADA);
+        if (justificacion == null || justificacion.trim().length() < 20) {
+            throw new com.universidad.pisc.config.BusinessException("La justificación del rechazo debe tener al menos 20 caracteres.");
+        }
+        this.motivoRechazo = motivo;
+        this.observacionResolucion = justificacion;
+        this.estado = EstadoSolicitud.RECHAZADA;
+    }
+        /**
+            * Permite reabrir una solicitud cerrada para correcciones o información adicional.
+        */
+    private void validarEstado(EstadoSolicitud... permitidos) {
+        boolean esValido = false;
+        for (EstadoSolicitud p : permitidos) {
+            if (this.estado == p) {
+                esValido = true;
+                break;
+            }
+        }
+        if (!esValido) {
+            throw new com.universidad.pisc.config.BusinessException(
+                String.format("Transición no permitida: la solicitud está en estado %s", this.estado)
+            );
+        }
+    }
 
     @PrePersist
     protected void alCrear() {
