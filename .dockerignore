@@ -6,6 +6,7 @@ target/
 *.puml
 *.yaml
 GEMINI.md
+AGENTS.md
 README.md
 Dockerfile
 apache-maven-3.9.6/

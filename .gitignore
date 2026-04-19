@@ -28,6 +28,7 @@ Thumbs.db
 *.jks
 
 # Project specific
+AGENTS.md
 GEMINI.md
 usuarios_sistema.txt
 esquema_bd.txt

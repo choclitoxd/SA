@@ -22,20 +22,20 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                // Endpoints de Gestión de Usuarios (Solo ADMINISTRATIVO)
-                .requestMatchers("/usuarios/**").hasRole("ADMINISTRATIVO")
+                // Endpoints de Gestión de Usuarios (ADMINISTRATIVO o DIRECTOR)
+                .requestMatchers("/usuarios/**").hasAnyRole("ADMINISTRATIVO", "DIRECTOR")
                 
-                // Endpoints de Catálogo y Reglas (ADMINISTRATIVO y COORDINADOR)
-                .requestMatchers("/tipos-solicitud/**").hasAnyRole("ADMINISTRATIVO", "COORDINADOR")
-                .requestMatchers("/reglas-prioridad/**").hasAnyRole("ADMINISTRATIVO", "COORDINADOR")
+                // Endpoints de Catálogo y Reglas (ADMINISTRATIVO, COORDINADOR o DIRECTOR)
+                .requestMatchers("/tipos-solicitud/**").hasAnyRole("ADMINISTRATIVO", "COORDINADOR", "DIRECTOR")
+                .requestMatchers("/reglas-prioridad/**").hasAnyRole("ADMINISTRATIVO", "COORDINADOR", "DIRECTOR")
                 
                 // Endpoints de Solicitudes (Acceso según acción)
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/solicitudes").hasAnyRole("ESTUDIANTE", "DOCENTE", "ADMINISTRATIVO")
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/solicitudes/**").authenticated()
-                .requestMatchers("/solicitudes/{id}/clasificar").hasAnyRole("COORDINADOR", "ADMINISTRATIVO")
-                .requestMatchers("/solicitudes/{id}/asignar").hasAnyRole("COORDINADOR", "ADMINISTRATIVO")
+                .requestMatchers("/solicitudes/{id}/clasificar").hasAnyRole("COORDINADOR", "ADMINISTRATIVO", "DIRECTOR")
+                .requestMatchers("/solicitudes/{id}/asignar").hasAnyRole("COORDINADOR", "ADMINISTRATIVO", "DIRECTOR")
                 .requestMatchers("/solicitudes/{id}/atender").hasAnyRole("DOCENTE", "ADMINISTRATIVO", "DIRECTOR", "COORDINADOR")
-                .requestMatchers("/solicitudes/{id}/cerrar").hasAnyRole("ESTUDIANTE", "DOCENTE", "ADMINISTRATIVO")
+                .requestMatchers("/solicitudes/{id}/cerrar").hasAnyRole("ESTUDIANTE", "DOCENTE", "ADMINISTRATIVO", "DIRECTOR", "COORDINADOR")
 
                 
                 // Permitir acceso a H2 Console y Swagger si es necesario para desarrollo
