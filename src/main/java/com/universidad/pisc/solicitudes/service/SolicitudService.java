@@ -8,7 +8,6 @@ import com.universidad.pisc.identidad.repository.UsuarioRepository;
 import com.universidad.pisc.solicitudes.dto.*;
 import com.universidad.pisc.solicitudes.enums.*;
 import com.universidad.pisc.solicitudes.model.*;
-import com.universidad.pisc.solicitudes.repository.HistorialSolicitudRepository;
 import com.universidad.pisc.solicitudes.repository.SolicitudAcademicaRepository;
 import com.universidad.pisc.solicitudes.repository.SugerenciaIARepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -25,11 +24,11 @@ import java.time.LocalDateTime;
 public class SolicitudService {
 
     private final SolicitudAcademicaRepository solicitudRepository;
-    private final HistorialSolicitudRepository historialRepository;
+    private final SolicitudHistorialService historialService;
     private final UsuarioRepository usuarioRepository;
     private final TipoSolicitudRepository tipoSolicitudRepository;
     private final TriageService triageService;
-    private final IAService iaService;
+    private final SolicitudClasificador clasificadorIA;
     private final SugerenciaIARepository sugerenciaIARepository;
     private final SolicitudMapper mapper;
 
@@ -48,16 +47,14 @@ public class SolicitudService {
 
         SolicitudAcademica guardada = solicitudRepository.save(solicitud);
         
-        // Generar sugerencia de IA y asociarla al objeto en memoria
-        SugerenciaIA sugerencia = iaService.generarSugerencia(guardada);
+        // Generar sugerencia de IA
+        SugerenciaIA sugerencia = clasificadorIA.generarSugerencia(guardada);
         guardada.setSugerenciaIA(sugerencia);
 
-        registrarHistorial(guardada, "registrarSolicitud", null, EstadoSolicitud.REGISTRADA, 
+        historialService.registrarEvento(guardada, "registrarSolicitud", null, EstadoSolicitud.REGISTRADA, 
                 "Solicitud registrada por el canal " + request.canal());
 
-        // Forzar flush para que la versión aumente antes de mapear al DTO
         solicitudRepository.flush();
-
         return mapper.toDetalleResponse(guardada);
     }
 
@@ -76,7 +73,6 @@ public class SolicitudService {
     @Transactional
     public SolicitudDetalleResponse clasificarSolicitud(Long id, ClasificarSolicitudRequest request) {
         SolicitudAcademica solicitud = obtenerEntidad(id);
-        
         validarVersion(solicitud, request.version());
         validarEstado(solicitud, EstadoSolicitud.REGISTRADA);
 
@@ -88,7 +84,6 @@ public class SolicitudService {
         if (request.sugerenciaIaId() != null) {
             SugerenciaIA sugerencia = sugerenciaIARepository.findById(request.sugerenciaIaId())
                     .orElseThrow(() -> new EntityNotFoundException("Sugerencia de IA no encontrada: " + request.sugerenciaIaId()));
-            
             sugerencia.setConfirmada(true);
             sugerencia.setAjustada(!sugerencia.getTipoSugerido().getId().equals(tipo.getId()));
             sugerenciaIARepository.save(sugerencia);
@@ -98,20 +93,18 @@ public class SolicitudService {
         String logInfo;
         if (request.nivelPrioridad() != null) {
             prioridad = new Prioridad(request.nivelPrioridad(), request.justificacionPrioridad(), LocalDateTime.now());
-            logInfo = "Solicitud clasificada manualmente como " + tipo.getNombre();
+            logInfo = "Clasificada manualmente como " + tipo.getNombre();
         } else {
             NivelPrioridad nivelAuto = triageService.evaluarPrioridad(solicitud);
-            prioridad = new Prioridad(nivelAuto, "Asignada automáticamente por el motor de reglas", LocalDateTime.now());
-            logInfo = "Solicitud clasificada automáticamente (Triage) como " + tipo.getNombre() + " con prioridad " + nivelAuto;
+            prioridad = new Prioridad(nivelAuto, "Triage automático", LocalDateTime.now());
+            logInfo = "Clasificada automáticamente como " + tipo.getNombre();
         }
         
         solicitud.setPrioridad(prioridad);
         solicitud.setEstado(EstadoSolicitud.CLASIFICADA);
         
         SolicitudAcademica actualizada = solicitudRepository.save(solicitud);
-        
-        registrarHistorial(actualizada, "clasificarSolicitud", EstadoSolicitud.REGISTRADA, EstadoSolicitud.CLASIFICADA, 
-                logInfo);
+        historialService.registrarEvento(actualizada, "clasificarSolicitud", EstadoSolicitud.REGISTRADA, EstadoSolicitud.CLASIFICADA, logInfo);
 
         return mapper.toDetalleResponse(actualizada);
     }
@@ -119,34 +112,27 @@ public class SolicitudService {
     @Transactional
     public SolicitudDetalleResponse asignarResponsable(Long id, AsignarResponsableRequest request) {
         SolicitudAcademica solicitud = obtenerEntidad(id);
-        
         validarVersion(solicitud, request.version());
         validarEstado(solicitud, EstadoSolicitud.CLASIFICADA, EstadoSolicitud.EN_ATENCION);
 
         EstadoSolicitud estadoAnterior = solicitud.getEstado();
-
         Usuario responsable = usuarioRepository.findById(request.responsableId())
-                .orElseThrow(() -> new EntityNotFoundException("Responsable no encontrado con id: " + request.responsableId()));
-
-        if (!responsable.getActivo()) {
-            throw new IllegalStateException("El responsable asignado debe estar activo");
-        }
+                .orElseThrow(() -> new EntityNotFoundException("Responsable no encontrado"));
 
         solicitud.getAsignaciones().forEach(a -> a.setActiva(false));
 
         Asignacion nuevaAsignacion = new Asignacion();
         nuevaAsignacion.setSolicitud(solicitud);
         nuevaAsignacion.setResponsable(responsable);
-        nuevaAsignacion.setAsignadoPor(obtenerUsuarioActual(solicitud.getSolicitante()));
+        nuevaAsignacion.setAsignadoPor(historialService.obtenerUsuarioActualParaAsignacion(solicitud.getSolicitante()));
         nuevaAsignacion.setNotas(request.notas());
         
         solicitud.getAsignaciones().add(nuevaAsignacion);
         solicitud.setEstado(EstadoSolicitud.EN_ATENCION);
 
         SolicitudAcademica actualizada = solicitudRepository.save(solicitud);
-        
-        registrarHistorial(actualizada, "asignarResponsable", estadoAnterior, EstadoSolicitud.EN_ATENCION, 
-                "Responsable asignado: " + responsable.getNombre() + " " + responsable.getApellido());
+        historialService.registrarEvento(actualizada, "asignarResponsable", estadoAnterior, EstadoSolicitud.EN_ATENCION, 
+                "Responsable: " + responsable.getNombre());
 
         return mapper.toDetalleResponse(actualizada);
     }
@@ -154,7 +140,6 @@ public class SolicitudService {
     @Transactional
     public SolicitudDetalleResponse marcarAtendida(Long id, MarcarAtendidaRequest request) {
         SolicitudAcademica solicitud = obtenerEntidad(id);
-        
         validarVersion(solicitud, request.version());
         validarEstado(solicitud, EstadoSolicitud.EN_ATENCION);
 
@@ -162,8 +147,7 @@ public class SolicitudService {
         solicitud.setEstado(EstadoSolicitud.ATENDIDA);
 
         SolicitudAcademica actualizada = solicitudRepository.save(solicitud);
-        
-        registrarHistorial(actualizada, "marcarAtendida", EstadoSolicitud.EN_ATENCION, EstadoSolicitud.ATENDIDA, 
+        historialService.registrarEvento(actualizada, "marcarAtendida", EstadoSolicitud.EN_ATENCION, EstadoSolicitud.ATENDIDA, 
                 "Resolución: " + request.observacionResolucion());
 
         return mapper.toDetalleResponse(actualizada);
@@ -172,7 +156,6 @@ public class SolicitudService {
     @Transactional
     public SolicitudDetalleResponse cerrarSolicitud(Long id, CerrarSolicitudRequest request) {
         SolicitudAcademica solicitud = obtenerEntidad(id);
-        
         validarVersion(solicitud, request.version());
         validarEstado(solicitud, EstadoSolicitud.ATENDIDA);
 
@@ -180,9 +163,8 @@ public class SolicitudService {
         solicitud.setEstado(EstadoSolicitud.CERRADA);
 
         SolicitudAcademica actualizada = solicitudRepository.save(solicitud);
-        
-        registrarHistorial(actualizada, "cerrarSolicitud", EstadoSolicitud.ATENDIDA, EstadoSolicitud.CERRADA, 
-                "Cierre formal: " + request.observacionCierre());
+        historialService.registrarEvento(actualizada, "cerrarSolicitud", EstadoSolicitud.ATENDIDA, EstadoSolicitud.CERRADA, 
+                "Cierre formal.");
 
         return mapper.toDetalleResponse(actualizada);
     }
@@ -190,20 +172,17 @@ public class SolicitudService {
     @Transactional
     public SolicitudDetalleResponse rechazarSolicitud(Long id, RechazarSolicitudRequest request) {
         SolicitudAcademica solicitud = obtenerEntidad(id);
-        
         validarVersion(solicitud, request.version());
         validarEstado(solicitud, EstadoSolicitud.REGISTRADA, EstadoSolicitud.CLASIFICADA);
 
         EstadoSolicitud estadoAnterior = solicitud.getEstado();
-
         solicitud.setMotivoRechazo(request.motivo());
         solicitud.setObservacionResolucion(request.justificacion());
         solicitud.setEstado(EstadoSolicitud.RECHAZADA);
 
         SolicitudAcademica actualizada = solicitudRepository.save(solicitud);
-        
-        registrarHistorial(actualizada, "rechazarSolicitud", estadoAnterior, EstadoSolicitud.RECHAZADA, 
-                "Motivo: " + request.motivo() + ". Justificación: " + request.justificacion());
+        historialService.registrarEvento(actualizada, "rechazarSolicitud", estadoAnterior, EstadoSolicitud.RECHAZADA, 
+                "Motivo: " + request.motivo());
 
         return mapper.toDetalleResponse(actualizada);
     }
@@ -224,30 +203,5 @@ public class SolicitudService {
         if (!permits.contains(solicitud.getEstado())) {
             throw new IllegalStateException("Transición de estado no permitida desde: " + solicitud.getEstado());
         }
-    }
-
-    private void registrarHistorial(SolicitudAcademica solicitud, String accion, 
-                                   EstadoSolicitud anterior, EstadoSolicitud nuevo, 
-                                   String obs) {
-        Usuario ejecutor = obtenerUsuarioActual(solicitud.getSolicitante());
-
-        HistorialSolicitud h = new HistorialSolicitud();
-        h.setSolicitud(solicitud);
-        h.setAccionRealizada(accion);
-        h.setEstadoAnterior(anterior);
-        h.setEstadoNuevo(nuevo);
-        h.setObservaciones(obs);
-        h.setEjecutadaPor(ejecutor);
-        historialRepository.save(h);
-    }
-
-    private Usuario obtenerUsuarioActual(Usuario fallback) {
-        org.springframework.security.core.Authentication auth = 
-                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        
-        if (auth != null && auth.isAuthenticated() && auth.getPrincipal() != null && !auth.getPrincipal().equals("anonymousUser")) {
-            return usuarioRepository.findByEmail(auth.getName()).orElse(fallback);
-        }
-        return fallback;
     }
 }
