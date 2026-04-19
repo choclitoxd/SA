@@ -16,7 +16,7 @@ public class Rol {
     private Long id;
 
     @Enumerated(EnumType.STRING)
-    @Column(length = 20, nullable = false, unique = true)
+    @Column(length = 50, nullable = false, unique = true)
     private NombreRol nombre;
 
     private String descripcion;
