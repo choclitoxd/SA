@@ -48,10 +48,10 @@ public class IAService {
             try {
                 this.model = GoogleAiGeminiChatModel.builder()
                         .apiKey(cleanApiKey)
-                        .modelName("gemini-1.5-flash") // Versión estable con cuota amplia
+                        .modelName("gemini-2.5-flash") // Modelo estable confirmado en el listado técnico
                         .logRequestsAndResponses(true)
                         .build();
-                log.info("Google Gemini (gemini-1.5-flash) inicializado correctamente.");
+                log.info("Google Gemini (gemini-2.5-flash) inicializado correctamente.");
             } catch (Exception e) {
 
                 log.error("Error al construir el modelo de Gemini: {}", e.getMessage());

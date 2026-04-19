@@ -30,12 +30,13 @@ public class SecurityConfig {
                 .requestMatchers("/reglas-prioridad/**").hasAnyRole("ADMINISTRATIVO", "COORDINADOR")
                 
                 // Endpoints de Solicitudes (Acceso según acción)
-                .requestMatchers(org.springframework.http.HttpMethod.POST, "/solicitudes").hasAnyRole("ESTUDIANTE", "ADMINISTRATIVO")
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/solicitudes").hasAnyRole("ESTUDIANTE", "DOCENTE", "ADMINISTRATIVO")
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/solicitudes/**").authenticated()
                 .requestMatchers("/solicitudes/{id}/clasificar").hasAnyRole("COORDINADOR", "ADMINISTRATIVO")
                 .requestMatchers("/solicitudes/{id}/asignar").hasAnyRole("COORDINADOR", "ADMINISTRATIVO")
-                .requestMatchers("/solicitudes/{id}/atender").hasAnyRole("ADMINISTRATIVO", "DIRECTOR", "COORDINADOR")
-                .requestMatchers("/solicitudes/{id}/cerrar").hasAnyRole("ESTUDIANTE", "ADMINISTRATIVO")
+                .requestMatchers("/solicitudes/{id}/atender").hasAnyRole("DOCENTE", "ADMINISTRATIVO", "DIRECTOR", "COORDINADOR")
+                .requestMatchers("/solicitudes/{id}/cerrar").hasAnyRole("ESTUDIANTE", "DOCENTE", "ADMINISTRATIVO")
+
                 
                 // Permitir acceso a H2 Console y Swagger si es necesario para desarrollo
                 .requestMatchers("/h2-console/**").permitAll()

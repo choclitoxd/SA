@@ -4,5 +4,6 @@ public enum NombreRol {
     ESTUDIANTE,
     COORDINADOR,
     ADMINISTRATIVO,
-    DIRECTOR
+    DIRECTOR,
+    DOCENTE
 }
