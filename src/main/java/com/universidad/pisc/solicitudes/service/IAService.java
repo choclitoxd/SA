@@ -38,14 +38,25 @@ public class IAService {
 
     @PostConstruct
     public void init() {
-        if ("PONER_AQUI_TU_API_KEY".equals(apiKey) || "NO_KEY".equals(apiKey)) {
-            log.warn("API Key de Gemini no configurada. Las sugerencias de IA serán simuladas.");
+        // Limpiar espacios en blanco de la llave por si acaso
+        String cleanApiKey = (apiKey != null) ? apiKey.trim() : "";
+
+        if (cleanApiKey.isEmpty() || "PONER_AQUI_TU_API_KEY".equals(cleanApiKey) || "NO_KEY".equals(cleanApiKey)) {
+            log.warn("API Key de Gemini no detectada o inválida. Usando modo simulación.");
             this.model = null;
         } else {
-            this.model = GoogleAiGeminiChatModel.builder()
-                    .apiKey(apiKey)
-                    .modelName("gemini-1.5-flash")
-                    .build();
+            try {
+                this.model = GoogleAiGeminiChatModel.builder()
+                        .apiKey(cleanApiKey)
+                        .modelName("gemini-1.5-flash") // Versión estable con cuota amplia
+                        .logRequestsAndResponses(true)
+                        .build();
+                log.info("Google Gemini (gemini-1.5-flash) inicializado correctamente.");
+            } catch (Exception e) {
+
+                log.error("Error al construir el modelo de Gemini: {}", e.getMessage());
+                this.model = null;
+            }
         }
     }
 
@@ -134,7 +145,9 @@ public class IAService {
         sugerencia.setTipoSugerido(sugerido);
         sugerencia.setPrioridadSugerida(triageService.evaluarPrioridad(solicitud));
         sugerencia.setConfianza(0.60);
-        sugerencia.setJustificacionIA("Simulación: Análisis básico por palabras clave (API Key no configurada).");
+        
+        String causa = (model == null) ? "API Key no configurada" : "Límite de cuota excedido o error de Google";
+        sugerencia.setJustificacionIA("Simulación: Análisis básico por palabras clave (" + causa + ").");
         return sugerenciaRepository.save(sugerencia);
     }
 }

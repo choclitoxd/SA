@@ -15,7 +15,8 @@ public class TipoSolicitudMapper {
                 tipoSolicitud.getNombre(),
                 tipoSolicitud.getDescripcion(),
                 tipoSolicitud.getTiempoAtencionDias(),
-                tipoSolicitud.getActivo()
+                tipoSolicitud.getActivo(),
+                tipoSolicitud.getCategoria()
         );
     }
 
@@ -27,7 +28,7 @@ public class TipoSolicitudMapper {
         tipoSolicitud.setNombre(request.nombre());
         tipoSolicitud.setDescripcion(request.descripcion());
         tipoSolicitud.setTiempoAtencionDias(request.tiempoAtencionDias());
-        // El estado 'activo' por defecto es 'true' en la entidad, no es necesario establecerlo aquí.
+        tipoSolicitud.setCategoria(request.categoria());
         return tipoSolicitud;
     }
 }

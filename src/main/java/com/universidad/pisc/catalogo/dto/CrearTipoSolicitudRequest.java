@@ -1,5 +1,6 @@
 package com.universidad.pisc.catalogo.dto;
 
+import com.universidad.pisc.catalogo.enums.CategoriaSolicitud;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -13,5 +14,8 @@ public record CrearTipoSolicitudRequest(
     String descripcion,
 
     @NotNull @Min(1) @Max(90)
-    Integer tiempoAtencionDias
+    Integer tiempoAtencionDias,
+
+    @NotNull
+    CategoriaSolicitud categoria
 ) {}
