@@ -48,8 +48,8 @@ public class Usuario {
     private String passwordHash;
 
     @NotNull
-    @Pattern(regexp = "^\\d{7,15}$")
-    @Column(nullable = false, unique = true, length = 15)
+    @Pattern(regexp = "^\\d{7,10}$")
+    @Column(nullable = false, unique = true, length = 10)
     private String identificacion;
 
     @NotNull

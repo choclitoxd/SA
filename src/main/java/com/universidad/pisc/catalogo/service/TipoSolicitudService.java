@@ -1,9 +1,12 @@
 package com.universidad.pisc.catalogo.service;
 
+import com.universidad.pisc.catalogo.dto.ActualizarTipoSolicitudRequest;
 import com.universidad.pisc.catalogo.dto.CrearTipoSolicitudRequest;
 import com.universidad.pisc.catalogo.dto.TipoSolicitudMapper;
 import com.universidad.pisc.catalogo.dto.TipoSolicitudResponse;
+import com.universidad.pisc.catalogo.model.Categoria;
 import com.universidad.pisc.catalogo.model.TipoSolicitud;
+import com.universidad.pisc.catalogo.repository.CategoriaRepository;
 import com.universidad.pisc.catalogo.repository.TipoSolicitudRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -18,14 +21,17 @@ import java.util.stream.Collectors;
 public class TipoSolicitudService {
 
     private final TipoSolicitudRepository repository;
+    private final CategoriaRepository categoriaRepository;
     private final TipoSolicitudMapper mapper;
 
     @Transactional
     public TipoSolicitudResponse crearTipoSolicitud(CrearTipoSolicitudRequest request) {
-        // Aquí se podría añadir lógica para comprobar duplicados por nombre y devolver un 409,
-        // pero la restricción de la BD ya lanzará un error. Para una API más limpia, una comprobación explícita es mejor.
-        // if (repository.findByNombre(request.nombre()).isPresent()) { ... lanzar excepción personalizada ... }
+        Categoria categoria = categoriaRepository.findById(request.categoriaId())
+                .orElseThrow(() -> new EntityNotFoundException("Categoría no encontrada con ID: " + request.categoriaId()));
+
         TipoSolicitud nuevoTipo = mapper.toEntity(request);
+        nuevoTipo.setCategoria(categoria);
+        
         TipoSolicitud guardado = repository.save(nuevoTipo);
         return mapper.toResponse(guardado);
     }
@@ -44,14 +50,27 @@ public class TipoSolicitudService {
     }
 
     @Transactional
-    public TipoSolicitudResponse actualizarTipoSolicitud(Long id, CrearTipoSolicitudRequest request) {
+    public TipoSolicitudResponse actualizarTipoSolicitud(Long id, ActualizarTipoSolicitudRequest request) {
         TipoSolicitud tipoExistente = repository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("TipoSolicitud no encontrado con id: " + id));
 
-        tipoExistente.setNombre(request.nombre());
-        tipoExistente.setDescripcion(request.descripcion());
-        tipoExistente.setTiempoAtencionDias(request.tiempoAtencionDias());
-        tipoExistente.setCategoria(request.categoria()); // Aseguramos que la categoría también se actualice
+        if (request.nombre() != null) {
+            tipoExistente.setNombre(request.nombre());
+        }
+        if (request.descripcion() != null) {
+            tipoExistente.setDescripcion(request.descripcion());
+        }
+        if (request.tiempoAtencionDias() != null) {
+            tipoExistente.setTiempoAtencionDias(request.tiempoAtencionDias());
+        }
+        if (request.categoriaId() != null) {
+            Categoria categoria = categoriaRepository.findById(request.categoriaId())
+                    .orElseThrow(() -> new EntityNotFoundException("Categoría no encontrada con ID: " + request.categoriaId()));
+            tipoExistente.setCategoria(categoria);
+        }
+        if (request.activo() != null) {
+            tipoExistente.setActivo(request.activo());
+        }
 
         TipoSolicitud actualizado = repository.save(tipoExistente);
         return mapper.toResponse(actualizado);

@@ -23,7 +23,7 @@ public record CrearUsuarioRequest(
     String email,
 
     @NotNull(message = "La identificación es obligatoria")
-    @Pattern(regexp = "^\\d{7,15}$", message = "La identificación debe contener entre 7 y 15 dígitos")
+    @Pattern(regexp = "^\\d{7,10}$", message = "La identificación debe contener entre 7 y 10 dígitos")
     String identificacion,
 
     @NotEmpty(message = "El usuario debe tener al menos un rol")

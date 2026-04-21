@@ -146,4 +146,24 @@ class SolicitudServiceTest {
         verify(solicitudRepository).save(solicitud);
         verify(historialService, times(1)).registrarEvento(any(), anyString(), any(), any(), anyString());
     }
+
+    @Test
+    void asignarResponsable_Failure_SameUser() {
+        // Arrange
+        solicitud.setEstado(EstadoSolicitud.CLASIFICADA);
+        // Asignamos el mismo ID del solicitante (1L)
+        AsignarResponsableRequest request = new AsignarResponsableRequest(1L, "Nota de asignación", 1L);
+        
+        when(solicitudRepository.findById(10L)).thenReturn(Optional.of(solicitud));
+        when(usuarioRepository.findById(1L)).thenReturn(Optional.of(solicitante));
+
+        // Act & Assert
+        com.universidad.pisc.config.BusinessException exception = assertThrows(
+                com.universidad.pisc.config.BusinessException.class,
+                () -> solicitudService.asignarResponsable(10L, request)
+        );
+
+        assertTrue(exception.getMessage().contains("El solicitante no puede ser asignado como responsable"));
+        verify(solicitudRepository, never()).save(any());
+    }
 }

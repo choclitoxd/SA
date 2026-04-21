@@ -1,6 +1,7 @@
 package com.universidad.pisc.catalogo.controller;
 
-import com.universidad.pisc.catalogo.model.ReglaPrioridad;
+import com.universidad.pisc.catalogo.dto.ReglaPrioridadRequest;
+import com.universidad.pisc.catalogo.dto.ReglaPrioridadResponse;
 import com.universidad.pisc.catalogo.service.ReglaPrioridadService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,17 +19,17 @@ public class ReglaPrioridadController {
     private final ReglaPrioridadService reglaService;
 
     @PostMapping
-    public ResponseEntity<ReglaPrioridad> crearRegla(@Valid @RequestBody ReglaPrioridad regla) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(reglaService.crearRegla(regla));
+    public ResponseEntity<ReglaPrioridadResponse> crearRegla(@Valid @RequestBody ReglaPrioridadRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(reglaService.crearRegla(request));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ReglaPrioridad> actualizarRegla(@PathVariable Long id, @RequestBody ReglaPrioridad datosNuevos) {
+    public ResponseEntity<ReglaPrioridadResponse> actualizarRegla(@PathVariable Long id, @RequestBody ReglaPrioridadRequest datosNuevos) {
         return ResponseEntity.ok(reglaService.actualizarRegla(id, datosNuevos));
     }
 
     @GetMapping
-    public ResponseEntity<List<ReglaPrioridad>> listarReglas() {
+    public ResponseEntity<List<ReglaPrioridadResponse>> listarReglas() {
         return ResponseEntity.ok(reglaService.listarReglasActivas());
     }
 

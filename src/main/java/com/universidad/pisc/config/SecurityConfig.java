@@ -40,6 +40,7 @@ public class SecurityConfig {
                 
                 // Permitir acceso a H2 Console y Swagger si es necesario para desarrollo
                 .requestMatchers("/h2-console/**").permitAll()
+                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .anyRequest().authenticated()
             )
             .headers(headers -> headers.frameOptions(frame -> frame.disable()))

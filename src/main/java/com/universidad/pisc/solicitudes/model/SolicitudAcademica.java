@@ -144,6 +144,14 @@ public class SolicitudAcademica {
     */
     public void asignar(Usuario responsable) {
         validarEstado(EstadoSolicitud.CLASIFICADA, EstadoSolicitud.EN_ATENCION);
+        
+        // Regla de Negocio: El responsable no puede ser el mismo solicitante.
+        if (responsable.getId().equals(this.solicitante.getId())) {
+            throw new com.universidad.pisc.config.BusinessException(
+                "Conflicto de intereses: El solicitante no puede ser asignado como responsable de su propia solicitud."
+            );
+        }
+
         this.estado = EstadoSolicitud.EN_ATENCION;
     }
     /**

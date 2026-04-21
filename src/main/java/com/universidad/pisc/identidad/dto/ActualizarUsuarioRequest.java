@@ -2,6 +2,7 @@ package com.universidad.pisc.identidad.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.Set;
 
@@ -18,6 +19,9 @@ public record ActualizarUsuarioRequest(
     @Email
     String email,
 
-    @NotEmpty // Se podría permitir un conjunto vacío si la lógica lo permitiera, pero 'NotEmpty' es más seguro.
+    @Pattern(regexp = "^\\d{7,10}$")
+    String identificacion,
+
+    @NotEmpty
     Set<NombreRol> roles
 ) {}

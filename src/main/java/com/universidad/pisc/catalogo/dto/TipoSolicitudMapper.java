@@ -16,7 +16,8 @@ public class TipoSolicitudMapper {
                 tipoSolicitud.getDescripcion(),
                 tipoSolicitud.getTiempoAtencionDias(),
                 tipoSolicitud.getActivo(),
-                tipoSolicitud.getCategoria()
+                tipoSolicitud.getCategoria().getNombre(),
+                tipoSolicitud.getCategoria().getId()
         );
     }
 
@@ -28,7 +29,7 @@ public class TipoSolicitudMapper {
         tipoSolicitud.setNombre(request.nombre());
         tipoSolicitud.setDescripcion(request.descripcion());
         tipoSolicitud.setTiempoAtencionDias(request.tiempoAtencionDias());
-        tipoSolicitud.setCategoria(request.categoria());
+        // Categoria must be set in the service
         return tipoSolicitud;
     }
 }

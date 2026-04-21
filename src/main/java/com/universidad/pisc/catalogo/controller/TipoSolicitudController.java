@@ -1,5 +1,6 @@
 package com.universidad.pisc.catalogo.controller;
 
+import com.universidad.pisc.catalogo.dto.ActualizarTipoSolicitudRequest;
 import com.universidad.pisc.catalogo.dto.CrearTipoSolicitudRequest;
 import com.universidad.pisc.catalogo.dto.TipoSolicitudResponse;
 import com.universidad.pisc.catalogo.service.TipoSolicitudService;
@@ -13,7 +14,7 @@ import java.net.URI;
 import java.util.List;
 
 @RestController
-@RequestMapping("/tipos-solicitud") // Ruta base del OpenAPI
+@RequestMapping("/tipos-solicitud")
 @RequiredArgsConstructor
 public class TipoSolicitudController {
 
@@ -21,15 +22,14 @@ public class TipoSolicitudController {
 
     @GetMapping
     public ResponseEntity<List<TipoSolicitudResponse>> listarTiposSolicitud(
-            @RequestParam(required = false, defaultValue = "true") Boolean activo) {
-        List<TipoSolicitudResponse> respuesta = tipoSolicitudService.listarTiposSolicitud(activo);
-        return ResponseEntity.ok(respuesta);
+            @RequestParam(required = false) Boolean activo) {
+        return ResponseEntity.ok(tipoSolicitudService.listarTiposSolicitud(activo));
     }
 
     @PostMapping
     public ResponseEntity<TipoSolicitudResponse> crearTipoSolicitud(@Valid @RequestBody CrearTipoSolicitudRequest request) {
         TipoSolicitudResponse respuesta = tipoSolicitudService.crearTipoSolicitud(request);
-        
+
         // Construye la URL del nuevo recurso creado, como es estándar en APIs REST.
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{id}")
@@ -43,7 +43,7 @@ public class TipoSolicitudController {
     @PutMapping("/{id}")
     public ResponseEntity<TipoSolicitudResponse> actualizarTipoSolicitud(
             @PathVariable Long id,
-            @Valid @RequestBody CrearTipoSolicitudRequest request) {
+            @Valid @RequestBody ActualizarTipoSolicitudRequest request) {
         TipoSolicitudResponse respuesta = tipoSolicitudService.actualizarTipoSolicitud(id, request);
         return ResponseEntity.ok(respuesta);
     }

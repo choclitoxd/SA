@@ -16,7 +16,7 @@ public record RegistrarSolicitudRequest(
     CanalOrigen canal,
 
     @NotNull(message = "El solicitanteId es obligatorio")
-    @Pattern(regexp = "^\\d{7,15}$", message = "El identificador del solicitante debe contener entre 7 y 15 dígitos")
+    @Pattern(regexp = "^\\d{7,10}$", message = "El identificador del solicitante debe contener entre 7 y 10 dígitos")
     String solicitanteId,
 
     LocalDate fechaLimite

@@ -69,10 +69,27 @@ public class SolicitudService {
 
     /**
      * Recupera el detalle completo de una solicitud por su ID.
+     * Incluye una regla de seguridad: El solicitante siempre tiene permiso de consulta.
      */
     @Transactional(readOnly = true)
     public SolicitudDetalleResponse obtenerSolicitud(Long id) {
-        return mapper.toDetalleResponse(obtenerEntidad(id));
+        SolicitudAcademica solicitud = obtenerEntidad(id);
+        
+        // Obtener el usuario autenticado desde el contexto de Spring Security
+        String emailActual = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        
+        boolean esSolicitante = solicitud.getSolicitante().getEmail().equals(emailActual);
+        boolean esAdministrativo = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRATIVO") || a.getAuthority().equals("ROLE_DIRECTOR") || a.getAuthority().equals("ROLE_COORDINADOR"));
+
+        if (!esSolicitante && !esAdministrativo) {
+            throw new com.universidad.pisc.config.BusinessException(
+                "Acceso denegado: No tiene permisos para consultar esta solicitud.", 
+                org.springframework.http.HttpStatus.FORBIDDEN
+            );
+        }
+
+        return mapper.toDetalleResponse(solicitud);
     }
 
     /**

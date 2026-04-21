@@ -1,6 +1,5 @@
 package com.universidad.pisc.catalogo.model;
 
-import com.universidad.pisc.catalogo.enums.CategoriaSolicitud;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -25,9 +24,9 @@ public class TipoSolicitud {
     private Long version;
 
     @NotNull
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private CategoriaSolicitud categoria;
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "categoria_id", nullable = false)
+    private Categoria categoria;
 
     @NotNull
     @Size(min = 3, max = 100)

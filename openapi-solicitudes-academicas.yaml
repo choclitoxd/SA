@@ -1144,10 +1144,10 @@ components:
         solicitanteId:
           type: string
           minLength: 7
-          maxLength: 15
-          pattern: '^\d{7,15}$'
+          maxLength: 10
+          pattern: '^\d{7,10}$'
           description: Número de identificación del estudiante solicitante
-          example: "1000234567"
+          example: "12345678"
         fechaLimite:
           type: string
           format: date
@@ -1408,8 +1408,8 @@ components:
           example: "juan.perez@universidad.edu.co"
         identificacion:
           type: string
-          pattern: '^\d{7,15}$'
-          example: "1000234567"
+          pattern: '^\d{7,10}$'
+          example: "12345678"
         roles:
           type: array
           minItems: 1

@@ -70,6 +70,11 @@ public class UsuarioService {
         Usuario usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado con id: " + id));
 
+        // Lógica de inmutabilidad: La identificación no puede cambiarse una vez registrada.
+        if (request.identificacion() != null && !request.identificacion().equals(usuario.getIdentificacion())) {
+            throw new IllegalStateException("La identificación de un usuario no puede ser modificada.");
+        }
+
         if (request.nombre() != null) {
             usuario.setNombre(request.nombre());
         }
