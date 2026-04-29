@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -51,8 +51,12 @@ public class TriageService {
         // Recuperar reglas activas ya ordenadas por peso desde la base de datos
         List<ReglaPrioridad> reglasActivas = reglaRepository.findByActivaTrueOrderByPesoDesc();
 
-        // Crear el contexto de evaluación apuntando al objeto solicitud
-        StandardEvaluationContext context = new StandardEvaluationContext(solicitud);
+        // Crear un contexto de evaluación seguro (Sandboxed)
+        // Permite lectura de propiedades y llamadas a métodos de instancia (.contains, .equals, etc.)
+        SimpleEvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding()
+                .withInstanceMethods()
+                .withRootObject(solicitud)
+                .build();
 
         for (ReglaPrioridad regla : reglasActivas) {
             try {

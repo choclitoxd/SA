@@ -14,6 +14,7 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,11 +39,9 @@ public class SolicitudService {
 
     /**
      * Registra una nueva solicitud en el sistema y dispara la clasificación sugerida por IA.
-     * @return Detalle de la solicitud con el código generado y sugerencia de IA inicial.
      */
     @Transactional
     public SolicitudDetalleResponse registrarSolicitud(RegistrarSolicitudRequest request) {
-        // ... (resto del código igual)
         Usuario solicitante = usuarioRepository.findByIdentificacion(request.solicitanteId())
                 .orElseThrow(() -> new EntityNotFoundException("Solicitante no encontrado con identificación: " + request.solicitanteId()));
 
@@ -56,7 +55,6 @@ public class SolicitudService {
 
         SolicitudAcademica guardada = solicitudRepository.save(solicitud);
         
-        // Generar sugerencia de IA
         SugerenciaIA sugerencia = clasificadorIA.generarSugerencia(guardada);
         guardada.setSugerenciaIA(sugerencia);
 
@@ -68,45 +66,34 @@ public class SolicitudService {
     }
 
     /**
-     * Recupera el detalle completo de una solicitud por su ID.
-     * Incluye una regla de seguridad: El solicitante siempre tiene permiso de consulta.
+     * Recupera el detalle completo de una solicitud por su ID con validación de propiedad (BOLA).
      */
     @Transactional(readOnly = true)
     public SolicitudDetalleResponse obtenerSolicitud(Long id) {
         SolicitudAcademica solicitud = obtenerEntidad(id);
-        
-        // Obtener el usuario autenticado desde el contexto de Spring Security
-        String emailActual = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
-        
-        boolean esSolicitante = solicitud.getSolicitante().getEmail().equals(emailActual);
-        boolean esAdministrativo = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRATIVO") || a.getAuthority().equals("ROLE_DIRECTOR") || a.getAuthority().equals("ROLE_COORDINADOR"));
-
-        if (!esSolicitante && !esAdministrativo) {
-            throw new com.universidad.pisc.config.BusinessException(
-                "Acceso denegado: No tiene permisos para consultar esta solicitud.", 
-                org.springframework.http.HttpStatus.FORBIDDEN
-            );
-        }
-
+        validarPropiedad(solicitud);
         return mapper.toDetalleResponse(solicitud);
     }
 
     /**
-        * Lista solicitudes de forma paginada para la vista de resumen.
-    */
+     * Lista solicitudes filtrando según el rol del usuario (Security Filtering).
+     */
     @Transactional(readOnly = true)
     public Page<SolicitudResumen> listarSolicitudes(Pageable pageable) {
-        return solicitudRepository.findAll(pageable)
+        String emailActual = obtenerEmailUsuarioActual();
+        
+        if (esPersonalAdministrativo()) {
+            return solicitudRepository.findAll(pageable).map(mapper::toResumen);
+        }
+        
+        // Estudiantes solo ven sus propias solicitudes
+        return solicitudRepository.findBySolicitanteEmail(emailActual, pageable)
                 .map(mapper::toResumen);
     }
 
-    /**
-        * Ejecuta la transición a CLASIFICADA asignando tipo y prioridad (manual o vía motor de reglas).
-    */
     @Transactional
     public SolicitudDetalleResponse clasificarSolicitud(Long id, ClasificarSolicitudRequest request) {
-        // ... (resto del código igual)
+        validarRolAdministrativo();
         SolicitudAcademica solicitud = obtenerEntidad(id);
         validarVersion(solicitud, request.version());
 
@@ -140,12 +127,9 @@ public class SolicitudService {
         return mapper.toDetalleResponse(actualizada);
     }
 
-    /**
-     * Asigna un responsable y mueve la solicitud a EN_ATENCION, gestionando la trazabilidad de asignaciones.
-     */
     @Transactional
     public SolicitudDetalleResponse asignarResponsable(Long id, AsignarResponsableRequest request) {
-        // ... (resto del código igual)
+        validarRolAdministrativo();
         SolicitudAcademica solicitud = obtenerEntidad(id);
         validarVersion(solicitud, request.version());
 
@@ -154,7 +138,6 @@ public class SolicitudService {
                 .orElseThrow(() -> new EntityNotFoundException("Responsable no encontrado"));
 
         solicitud.asignar(responsable);
-        
         solicitud.getAsignaciones().forEach(a -> a.setActiva(false));
 
         Asignacion nuevaAsignacion = new Asignacion();
@@ -172,12 +155,9 @@ public class SolicitudService {
         return mapper.toDetalleResponse(actualizada);
     }
 
-    /**
-     * Registra la solución técnica de la solicitud. Requiere estado EN_ATENCION.
-     */
     @Transactional
     public SolicitudDetalleResponse marcarAtendida(Long id, MarcarAtendidaRequest request) {
-        // ... (resto del código igual)
+        validarRolAdministrativo();
         SolicitudAcademica solicitud = obtenerEntidad(id);
         validarVersion(solicitud, request.version());
 
@@ -190,12 +170,9 @@ public class SolicitudService {
         return mapper.toDetalleResponse(actualizada);
     }
 
-    /**
-     * Cierre formal de la solicitud tras validación de la atención. Bloquea cambios posteriores.
-     */
     @Transactional
     public SolicitudDetalleResponse cerrarSolicitud(Long id, CerrarSolicitudRequest request) {
-        // ... (resto del código igual)
+        validarRolAdministrativo();
         SolicitudAcademica solicitud = obtenerEntidad(id);
         validarVersion(solicitud, request.version());
 
@@ -208,12 +185,9 @@ public class SolicitudService {
         return mapper.toDetalleResponse(actualizada);
     }
 
-    /**
-     * Cancela la solicitud registrando el motivo administrativo del rechazo.
-     */
     @Transactional
     public SolicitudDetalleResponse rechazarSolicitud(Long id, RechazarSolicitudRequest request) {
-        // ... (resto del código igual)
+        validarRolAdministrativo();
         SolicitudAcademica solicitud = obtenerEntidad(id);
         validarVersion(solicitud, request.version());
 
@@ -233,9 +207,37 @@ public class SolicitudService {
     }
 
     /**
-     * Garantiza la integridad de datos mediante bloqueo optimista.
-     * @throws BusinessException si la versión del cliente es obsoleta (HTTP 409).
+     * Centraliza la validación de propiedad para cumplir con OWASP BOLA.
      */
+    private void validarPropiedad(SolicitudAcademica solicitud) {
+        if (!esPersonalAdministrativo() && !solicitud.getSolicitante().getEmail().equals(obtenerEmailUsuarioActual())) {
+            throw new com.universidad.pisc.config.BusinessException(
+                "Acceso denegado: Esta solicitud no le pertenece.", 
+                org.springframework.http.HttpStatus.FORBIDDEN
+            );
+        }
+    }
+
+    private void validarRolAdministrativo() {
+        if (!esPersonalAdministrativo()) {
+            throw new com.universidad.pisc.config.BusinessException(
+                "Acceso denegado: Solo el personal administrativo puede realizar esta acción.", 
+                org.springframework.http.HttpStatus.FORBIDDEN
+            );
+        }
+    }
+
+    private boolean esPersonalAdministrativo() {
+        return SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMINISTRATIVO") || 
+                               a.getAuthority().equals("ROLE_DIRECTOR") || 
+                               a.getAuthority().equals("ROLE_COORDINADOR"));
+    }
+
+    private String obtenerEmailUsuarioActual() {
+        return SecurityContextHolder.getContext().getAuthentication().getName();
+    }
+
     private void validarVersion(SolicitudAcademica solicitud, Long version) {
         if (!solicitud.getVersion().equals(version)) {
             throw new com.universidad.pisc.config.BusinessException("Conflicto de concurrencia: la solicitud fue modificada por otro usuario.", org.springframework.http.HttpStatus.CONFLICT);
