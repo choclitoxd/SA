@@ -194,4 +194,24 @@ class SolicitudServiceTest {
         // Assert
         assertNotNull(response);
     }
+
+    @Test
+    void reabrirSolicitud_Success() {
+        // Arrange
+        mockSecurityContext("admin@universidad.edu.co", "ROLE_ADMINISTRATIVO");
+        solicitud.setEstado(EstadoSolicitud.CERRADA);
+        ReabrirSolicitudRequest request = new ReabrirSolicitudRequest(1L, "Justificación de reapertura mayor a 20 caracteres");
+
+        when(solicitudRepository.findById(10L)).thenReturn(Optional.of(solicitud));
+        when(solicitudRepository.save(any(SolicitudAcademica.class))).thenReturn(solicitud);
+
+        // Act
+        solicitudService.reabrirSolicitud(10L, request);
+
+        // Assert
+        assertEquals(EstadoSolicitud.EN_ATENCION, solicitud.getEstado());
+        assertEquals(1, solicitud.getContadorReaperturas());
+        verify(solicitudRepository).save(solicitud);
+        verify(historialService).registrarEvento(any(), eq("reabrirSolicitud"), eq(EstadoSolicitud.CERRADA), eq(EstadoSolicitud.EN_ATENCION), anyString());
+    }
 }

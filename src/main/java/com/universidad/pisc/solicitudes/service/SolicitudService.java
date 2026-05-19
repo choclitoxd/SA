@@ -11,14 +11,20 @@ import com.universidad.pisc.solicitudes.model.*;
 import com.universidad.pisc.solicitudes.repository.SolicitudAcademicaRepository;
 import com.universidad.pisc.solicitudes.repository.SugerenciaIARepository;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Orquestador del ciclo de vida de solicitudes académicas.
@@ -76,19 +82,49 @@ public class SolicitudService {
     }
 
     /**
-     * Lista solicitudes filtrando según el rol del usuario (Security Filtering).
+     * Lista solicitudes filtrando según el rol del usuario (Security Filtering) y criterios opcionales.
      */
     @Transactional(readOnly = true)
-    public Page<SolicitudResumen> listarSolicitudes(Pageable pageable) {
+    public Page<SolicitudResumen> listarSolicitudes(
+            EstadoSolicitud estado, 
+            Long tipoId, 
+            NivelPrioridad prioridad, 
+            Long responsableId, 
+            Pageable pageable) {
+        
         String emailActual = obtenerEmailUsuarioActual();
-        
-        if (esPersonalAdministrativo()) {
-            return solicitudRepository.findAll(pageable).map(mapper::toResumen);
-        }
-        
-        // Estudiantes solo ven sus propias solicitudes
-        return solicitudRepository.findBySolicitanteEmail(emailActual, pageable)
-                .map(mapper::toResumen);
+        boolean esAdmin = esPersonalAdministrativo();
+
+        Specification<SolicitudAcademica> spec = (root, query, cb) -> {
+            query.distinct(true);
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (estado != null) {
+                predicates.add(cb.equal(root.get("estado"), estado));
+            }
+            if (tipoId != null) {
+                predicates.add(cb.equal(root.get("tipo").get("id"), tipoId));
+            }
+            if (prioridad != null) {
+                predicates.add(cb.equal(root.get("prioridad").get("nivel"), prioridad));
+            }
+            if (responsableId != null) {
+                Join<SolicitudAcademica, Asignacion> asignaciones = root.join("asignaciones", JoinType.LEFT);
+                predicates.add(cb.and(
+                    cb.equal(asignaciones.get("responsable").get("id"), responsableId),
+                    cb.isTrue(asignaciones.get("activa"))
+                ));
+            }
+
+            // Seguridad OWASP BOLA: Estudiantes solo ven sus propias solicitudes
+            if (!esAdmin) {
+                predicates.add(cb.equal(root.get("solicitante").get("email"), emailActual));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        return solicitudRepository.findAll(spec, pageable).map(mapper::toResumen);
     }
 
     @Transactional
@@ -197,6 +233,22 @@ public class SolicitudService {
         SolicitudAcademica actualizada = solicitudRepository.save(solicitud);
         historialService.registrarEvento(actualizada, "rechazarSolicitud", estadoAnterior, EstadoSolicitud.RECHAZADA, 
                 "Motivo: " + request.motivo());
+
+        return mapper.toDetalleResponse(actualizada);
+    }
+
+    @Transactional
+    public SolicitudDetalleResponse reabrirSolicitud(Long id, ReabrirSolicitudRequest request) {
+        validarRolAdministrativo(); // O tal vez el solicitante también? El plan dice Administrativo usualmente.
+        SolicitudAcademica solicitud = obtenerEntidad(id);
+        validarVersion(solicitud, request.version());
+
+        EstadoSolicitud estadoAnterior = solicitud.getEstado();
+        solicitud.reabrir(request.justificacion());
+
+        SolicitudAcademica actualizada = solicitudRepository.save(solicitud);
+        historialService.registrarEvento(actualizada, "reabrirSolicitud", estadoAnterior, EstadoSolicitud.EN_ATENCION, 
+                "Justificación: " + request.justificacion());
 
         return mapper.toDetalleResponse(actualizada);
     }

@@ -189,9 +189,19 @@ public class SolicitudAcademica {
         this.observacionResolucion = justificacion;
         this.estado = EstadoSolicitud.RECHAZADA;
     }
-        /**
-            * Permite reabrir una solicitud cerrada para correcciones o información adicional.
-        */
+    /**
+     * Permite reabrir una solicitud cerrada o rechazada para correcciones o información adicional.
+     */
+    public void reabrir(String justificacion) {
+        validarEstado(EstadoSolicitud.CERRADA, EstadoSolicitud.RECHAZADA, EstadoSolicitud.ATENDIDA);
+        if (justificacion == null || justificacion.trim().length() < 20) {
+            throw new com.universidad.pisc.config.BusinessException("La justificación de la reapertura debe tener al menos 20 caracteres.");
+        }
+        this.estado = EstadoSolicitud.EN_ATENCION;
+        this.contadorReaperturas++;
+        this.observacionResolucion = "[REAPERTURA] " + justificacion;
+    }
+
     private void validarEstado(EstadoSolicitud... permitidos) {
         boolean esValido = false;
         for (EstadoSolicitud p : permitidos) {

@@ -1,6 +1,8 @@
 package com.universidad.pisc.solicitudes.controller;
 
+import com.universidad.pisc.catalogo.enums.NivelPrioridad;
 import com.universidad.pisc.solicitudes.dto.*;
+import com.universidad.pisc.solicitudes.enums.EstadoSolicitud;
 import com.universidad.pisc.solicitudes.service.SolicitudService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -35,8 +37,13 @@ public class SolicitudController {
     }
 
     @GetMapping
-    public ResponseEntity<Page<SolicitudResumen>> listarSolicitudes(Pageable pageable) {
-        return ResponseEntity.ok(solicitudService.listarSolicitudes(pageable));
+    public ResponseEntity<Page<SolicitudResumen>> listarSolicitudes(
+            @RequestParam(required = false) EstadoSolicitud estado,
+            @RequestParam(required = false) Long tipoId,
+            @RequestParam(required = false) NivelPrioridad prioridad,
+            @RequestParam(required = false) Long responsableId,
+            Pageable pageable) {
+        return ResponseEntity.ok(solicitudService.listarSolicitudes(estado, tipoId, prioridad, responsableId, pageable));
     }
 
     @PostMapping("/{id}/clasificar")
@@ -72,5 +79,12 @@ public class SolicitudController {
             @PathVariable Long id, 
             @Valid @RequestBody RechazarSolicitudRequest request) {
         return ResponseEntity.ok(solicitudService.rechazarSolicitud(id, request));
+    }
+
+    @PostMapping("/{id}/reabrir")
+    public ResponseEntity<SolicitudDetalleResponse> reabrirSolicitud(
+            @PathVariable Long id, 
+            @Valid @RequestBody ReabrirSolicitudRequest request) {
+        return ResponseEntity.ok(solicitudService.reabrirSolicitud(id, request));
     }
 }
