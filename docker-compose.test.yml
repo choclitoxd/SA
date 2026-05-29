@@ -1,0 +1,14 @@
+services:
+
+  frontend-test:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.test
+    container_name: pisc-frontend-test
+    # El contenedor termina solo cuando los tests terminan.
+    # El exit code refleja el resultado: 0 = todos pasan, 1 = alguno falla.
+    environment:
+      - CHROME_BIN=/usr/bin/chromium
+    volumes:
+      # Montar coverage para verlo en el host después de correr
+      - ./frontend/coverage:/app/coverage

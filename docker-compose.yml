@@ -1,0 +1,41 @@
+services:
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pisc-backend
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./backend/env
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/localhost/8080' && exit 0 || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    networks:
+      - pisc-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pisc-frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - pisc-network
+    restart: unless-stopped
+
+networks:
+  pisc-network:
+    driver: bridge
