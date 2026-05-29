@@ -1,0 +1,48 @@
+<aside class="sidebar">
+  <div class="sidebar__brand">
+    <div class="brand-icon">
+      <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="32" height="32" rx="8" fill="#3B82F6"/>
+        <path d="M8 10h16M8 16h10M8 22h12" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="24" cy="22" r="4" fill="#F59E0B"/>
+      </svg>
+    </div>
+    <div class="brand-text">
+      <span class="brand-name">PISC</span>
+      <span class="brand-sub">Solicitudes Académicas</span>
+    </div>
+  </div>
+
+  <nav class="sidebar__nav">
+    <ul>
+      @for (item of visibleItems; track item.route) {
+        <li>
+          <a
+            [routerLink]="item.route"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: item.route === '/dashboard' }"
+            class="nav-link"
+          >
+            <span class="nav-icon" [innerHTML]="getIcon(item.icon)"></span>
+            <span class="nav-label">{{ item.label }}</span>
+          </a>
+        </li>
+      }
+    </ul>
+  </nav>
+
+  <div class="sidebar__user">
+    <div class="user-avatar">{{ userInitials }}</div>
+    <div class="user-info">
+      <span class="user-name">{{ userName }}</span>
+      <span class="user-role">{{ userRoleLabel }}</span>
+    </div>
+    <button class="logout-btn" (click)="logout()" title="Cerrar sesión">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+    </button>
+  </div>
+</aside>

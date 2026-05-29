@@ -1,0 +1,130 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Reglas de Prioridad</h1>
+      <p class="subtitle">Motor de reglas SpEL para clasificación automática</p>
+    </div>
+    <button (click)="openCrear()" class="btn-primary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Nueva Regla
+    </button>
+  </div>
+
+  <div class="card">
+    @if (loading()) {
+      <div class="loading-state"><div class="spinner"></div></div>
+    } @else if (reglas().length === 0) {
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+          <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+          <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
+        </svg>
+        <p>No hay reglas de prioridad configuradas.</p>
+      </div>
+    } @else {
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Condición (SpEL)</th>
+              <th>Prioridad</th>
+              <th>Peso</th>
+              <th>Estado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of reglas(); track r.id) {
+              <tr>
+                <td>
+                  <div class="name-with-desc">
+                    <span class="rule-name">{{ r.nombre }}</span>
+                    @if (r.descripcion) { <span class="rule-desc">{{ r.descripcion }}</span> }
+                  </div>
+                </td>
+                <td><code class="condition-code">{{ r.condicion }}</code></td>
+                <td><span [class]="getPrioridadClass(r.nivelResultante)">{{ prioridadLabels[r.nivelResultante] }}</span></td>
+                <td class="center-cell weight-cell">{{ r.peso }}</td>
+                <td>
+                  <span [class]="r.activa ? 'status-badge status-badge--active' : 'status-badge status-badge--inactive'">
+                    {{ r.activa ? 'Activa' : 'Inactiva' }}
+                  </span>
+                </td>
+                <td>
+                  <div class="row-actions">
+                    <button (click)="openEditar(r)" class="btn-icon" title="Editar">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                      </svg>
+                    </button>
+                    <button (click)="eliminar(r)" class="btn-icon btn-icon--danger" title="Eliminar">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                        <path d="M10 11v6"/><path d="M14 11v6"/>
+                      </svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>
+
+@if (activeModal()) {
+  <div class="modal-backdrop" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h2 class="modal-title">{{ activeModal() === 'crear' ? 'Nueva Regla' : 'Editar Regla' }}</h2>
+      <p class="modal-hint">Las condiciones usan SpEL (Spring Expression Language) sobre el objeto <code>solicitud</code>.</p>
+      @if (error()) { <div class="error-alert">{{ error() }}</div> }
+      <div class="modal-field">
+        <label>Nombre *</label>
+        <input type="text" [(ngModel)]="form.nombre" placeholder="Ej: Solicitud de grado crítica" />
+      </div>
+      <div class="modal-field">
+        <label>Descripción</label>
+        <input type="text" [(ngModel)]="form.descripcion" placeholder="Descripción opcional..." />
+      </div>
+      <div class="modal-field">
+        <label>Condición SpEL *</label>
+        <input type="text" [(ngModel)]="form.condicion" placeholder='Ej: tipoNombre == "Grado"' class="mono-input" />
+        <span class="field-hint">Variables disponibles: <code>tipoNombre</code>, <code>diasRestantes</code>, <code>descripcion</code></span>
+      </div>
+      <div class="modal-row">
+        <div class="modal-field">
+          <label>Prioridad Resultante *</label>
+          <select [(ngModel)]="form.nivelResultante">
+            @for (p of prioridades; track p) {
+              <option [value]="p">{{ prioridadLabels[p] }}</option>
+            }
+          </select>
+        </div>
+        <div class="modal-field">
+          <label>Peso (mayor = mayor prioridad)</label>
+          <input type="number" [(ngModel)]="form.peso" min="1" max="1000" />
+        </div>
+      </div>
+      <div class="modal-field modal-field--check">
+        <label class="check-label">
+          <input type="checkbox" [(ngModel)]="form.activa" />
+          Regla activa
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button (click)="closeModal()" class="btn-secondary">Cancelar</button>
+        <button (click)="submit()" class="btn-primary" [disabled]="submitting()">
+          @if (submitting()) { Guardando... } @else { Guardar }
+        </button>
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,111 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Tipos de Solicitud</h1>
+      <p class="subtitle">Catálogo de tipos y categorías disponibles</p>
+    </div>
+    <button (click)="openCrear()" class="btn-primary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Nuevo Tipo
+    </button>
+  </div>
+
+  <div class="card">
+    @if (loading()) {
+      <div class="loading-state"><div class="spinner"></div></div>
+    } @else if (tipos().length === 0) {
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/>
+          <line x1="7" y1="7" x2="7.01" y2="7"/>
+        </svg>
+        <p>No hay tipos de solicitud registrados.</p>
+      </div>
+    } @else {
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Categoría</th>
+              <th>Tiempo de Atención</th>
+              <th>Descripción</th>
+              <th>Estado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (t of tipos(); track t.id) {
+              <tr>
+                <td class="name-cell">{{ t.nombre }}</td>
+                <td><span class="cat-badge">{{ categoriaLabels[t.categoria] }}</span></td>
+                <td class="center-cell">{{ t.tiempoAtencionDias }} días</td>
+                <td class="desc-cell">{{ t.descripcion ?? '—' }}</td>
+                <td>
+                  <span [class]="t.activo ? 'status-badge status-badge--active' : 'status-badge status-badge--inactive'">
+                    {{ t.activo ? 'Activo' : 'Inactivo' }}
+                  </span>
+                </td>
+                <td>
+                  <div class="row-actions">
+                    <button (click)="openEditar(t)" class="btn-icon" title="Editar">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                      </svg>
+                    </button>
+                    @if (t.activo) {
+                      <button (click)="desactivar(t)" class="btn-icon btn-icon--danger" title="Desactivar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>
+
+@if (activeModal()) {
+  <div class="modal-backdrop" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h2 class="modal-title">{{ activeModal() === 'crear' ? 'Nuevo Tipo' : 'Editar Tipo' }}</h2>
+      @if (error()) { <div class="error-alert">{{ error() }}</div> }
+      <div class="modal-field">
+        <label>Nombre *</label>
+        <input type="text" [(ngModel)]="form.nombre" placeholder="Ej: Homologación de asignaturas" />
+      </div>
+      <div class="modal-field">
+        <label>Categoría *</label>
+        <select [(ngModel)]="form.categoria">
+          <option value="" disabled>Seleccionar categoría...</option>
+          @for (c of categorias; track c) {
+            <option [value]="c">{{ categoriaLabels[c] }}</option>
+          }
+        </select>
+      </div>
+      <div class="modal-field">
+        <label>Tiempo de Atención (días) *</label>
+        <input type="number" [(ngModel)]="form.tiempoAtencionDias" min="1" max="90" />
+      </div>
+      <div class="modal-field">
+        <label>Descripción (opcional)</label>
+        <textarea [(ngModel)]="form.descripcion" rows="2" placeholder="Descripción del tipo..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button (click)="closeModal()" class="btn-secondary">Cancelar</button>
+        <button (click)="submit()" class="btn-primary" [disabled]="submitting()">
+          @if (submitting()) { Guardando... } @else { Guardar }
+        </button>
+      </div>
+    </div>
+  </div>
+}

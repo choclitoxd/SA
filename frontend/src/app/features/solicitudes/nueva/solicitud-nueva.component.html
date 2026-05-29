@@ -1,0 +1,91 @@
+<div class="page">
+  <div class="breadcrumb">
+    <a routerLink="/solicitudes" class="back-link">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+      </svg>
+      Solicitudes
+    </a>
+    <span>/</span>
+    <span>Nueva Solicitud</span>
+  </div>
+
+  <div class="form-card">
+    <div class="form-card__header">
+      <h1>Registrar Solicitud Académica</h1>
+      <p>Completa la información para registrar tu solicitud. La IA sugerirá el tipo y prioridad automáticamente.</p>
+    </div>
+
+    <form (ngSubmit)="submit()" class="form-body">
+      @if (error()) {
+        <div class="error-alert">{{ error() }}</div>
+      }
+
+      <div class="field">
+        <label>
+          Número de Identificación del Solicitante *
+        </label>
+        <input
+          type="text"
+          [(ngModel)]="form.solicitanteId"
+          name="solicitanteId"
+          placeholder="Ej: 1234567890"
+          maxlength="15"
+          required
+        />
+        <span class="field-hint">Cédula o documento del solicitante (7-15 dígitos)</span>
+      </div>
+
+      <div class="field">
+        <label>Canal de Origen *</label>
+        <select [(ngModel)]="form.canal" name="canal" required>
+          <option value="" disabled>Selecciona el canal...</option>
+          @for (c of canales; track c) {
+            <option [value]="c">{{ canalLabels[c] }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="field field--full">
+        <label>Descripción de la Solicitud *</label>
+        <textarea
+          [(ngModel)]="form.descripcion"
+          name="descripcion"
+          rows="6"
+          placeholder="Describe detalladamente tu solicitud. Incluye información relevante como asignaturas, períodos académicos, motivos, etc. (mínimo 30 caracteres)"
+          maxlength="2000"
+          required
+        ></textarea>
+        <div class="field-footer">
+          <span class="field-hint">Mínimo 30 caracteres</span>
+          <span class="char-count" [class.warn]="form.descripcion.length < 30 && form.descripcion.length > 0">
+            {{ form.descripcion.length }}/2000
+          </span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Fecha Límite (opcional)</label>
+        <input type="date" [(ngModel)]="form.fechaLimite" name="fechaLimite" />
+        <span class="field-hint">Fecha en que debe resolverse la solicitud</span>
+      </div>
+
+      <div class="ia-notice">
+        <div class="ia-badge">IA</div>
+        <p>Una vez registrada, el sistema analizará automáticamente la descripción para sugerir el tipo y prioridad de la solicitud.</p>
+      </div>
+
+      <div class="form-actions">
+        <a routerLink="/solicitudes" class="btn-secondary">Cancelar</a>
+        <button type="submit" class="btn-primary" [disabled]="loading()">
+          @if (loading()) {
+            <span class="spinner"></span>
+            Registrando...
+          } @else {
+            Registrar Solicitud
+          }
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,153 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Gestión de Usuarios</h1>
+      <p class="subtitle">
+        @if (!loading()) { {{ totalElements() }} usuario(s) en el sistema }
+      </p>
+    </div>
+    <button (click)="openCrear()" class="btn-primary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Nuevo Usuario
+    </button>
+  </div>
+
+  <div class="card">
+    @if (loading()) {
+      <div class="loading-state"><div class="spinner"></div><p>Cargando usuarios...</p></div>
+    } @else if (usuarios().length === 0) {
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
+        </svg>
+        <p>No hay usuarios registrados.</p>
+      </div>
+    } @else {
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Correo</th>
+              <th>Identificación</th>
+              <th>Roles</th>
+              <th>Estado</th>
+              <th>Registrado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (u of usuarios(); track u.id) {
+              <tr>
+                <td class="name-cell">
+                  <div class="avatar">{{ u.nombre[0] }}{{ u.apellido[0] }}</div>
+                  <span>{{ u.nombre }} {{ u.apellido }}</span>
+                </td>
+                <td class="email-cell">{{ u.email }}</td>
+                <td class="mono">{{ u.identificacion }}</td>
+                <td>
+                  <div class="roles-list">
+                    @for (r of u.roles; track r) {
+                      <span class="role-chip">{{ r }}</span>
+                    }
+                  </div>
+                </td>
+                <td>
+                  <span [class]="u.activo ? 'status-badge status-badge--active' : 'status-badge status-badge--inactive'">
+                    {{ u.activo ? 'Activo' : 'Inactivo' }}
+                  </span>
+                </td>
+                <td class="date-cell">{{ u.creadoEn | date:'dd MMM yyyy' }}</td>
+                <td>
+                  <div class="row-actions">
+                    <button (click)="openEditar(u)" class="btn-icon" title="Editar">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                      </svg>
+                    </button>
+                    @if (u.activo) {
+                      <button (click)="desactivar(u)" class="btn-icon btn-icon--danger" title="Desactivar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (totalPages() > 1) {
+        <div class="pagination">
+          <button (click)="goToPage(currentPage() - 1)" [disabled]="currentPage() === 0" class="page-btn">← Anterior</button>
+          @for (p of pages; track p) {
+            <button (click)="goToPage(p)" [class.active]="p === currentPage()" class="page-btn page-btn--num">{{ p + 1 }}</button>
+          }
+          <button (click)="goToPage(currentPage() + 1)" [disabled]="currentPage() === totalPages() - 1" class="page-btn">Siguiente →</button>
+        </div>
+      }
+    }
+  </div>
+</div>
+
+<!-- Modal crear / editar -->
+@if (activeModal()) {
+  <div class="modal-backdrop" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h2 class="modal-title">{{ activeModal() === 'crear' ? 'Nuevo Usuario' : 'Editar Usuario' }}</h2>
+
+      @if (error()) { <div class="error-alert">{{ error() }}</div> }
+
+      <div class="modal-grid">
+        <div class="modal-field">
+          <label>Nombre *</label>
+          <input type="text" [(ngModel)]="form.nombre" placeholder="Nombre" />
+        </div>
+        <div class="modal-field">
+          <label>Apellido *</label>
+          <input type="text" [(ngModel)]="form.apellido" placeholder="Apellido" />
+        </div>
+        <div class="modal-field">
+          <label>Correo *</label>
+          <input type="email" [(ngModel)]="form.email" placeholder="correo@universidad.edu.co" />
+        </div>
+        <div class="modal-field">
+          <label>Identificación *</label>
+          <input type="text" [(ngModel)]="form.identificacion" placeholder="Número de documento" [disabled]="activeModal() === 'editar'" />
+        </div>
+        @if (activeModal() === 'crear') {
+          <div class="modal-field modal-field--full">
+            <label>Contraseña *</label>
+            <input type="password" [(ngModel)]="form.password" placeholder="Mínimo 8 caracteres" />
+          </div>
+        }
+        <div class="modal-field modal-field--full">
+          <label>Roles *</label>
+          <div class="roles-picker">
+            @for (r of roles; track r) {
+              <button type="button" (click)="toggleRole(r)" [class.selected]="hasRole(r)" class="role-toggle">{{ r }}</button>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button (click)="closeModal()" class="btn-secondary">Cancelar</button>
+        <button
+          (click)="activeModal() === 'crear' ? submitCrear() : submitEditar()"
+          class="btn-primary"
+          [disabled]="submitting()"
+        >
+          @if (submitting()) { Guardando... } @else { Guardar }
+        </button>
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,333 @@
+<div class="page">
+  <div class="breadcrumb">
+    <button (click)="goBack()" class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+      </svg>
+      Solicitudes
+    </button>
+    <span>/</span>
+    @if (solicitud()) {
+      <span class="code-crumb">{{ solicitud()!.codigo }}</span>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state">
+      <div class="spinner-lg"></div>
+      <p>Cargando solicitud...</p>
+    </div>
+  } @else if (!solicitud()) {
+    <div class="error-state">
+      <p>{{ error() || 'Solicitud no encontrada.' }}</p>
+      <button (click)="goBack()" class="btn-secondary">Volver</button>
+    </div>
+  } @else {
+    <div class="detail-grid">
+      <!-- LEFT: Main info -->
+      <div class="main-col">
+        <!-- Header card -->
+        <div class="card header-card">
+          <div class="header-card__top">
+            <div>
+              <div class="code-display">{{ solicitud()!.codigo }}</div>
+              <div class="header-badges">
+                <span [class]="getEstadoClass(solicitud()!.estado)">{{ estadoLabels[solicitud()!.estado] }}</span>
+                @if (solicitud()!.prioridad) {
+                  <span [class]="getPrioridadClass(solicitud()!.prioridad!.nivel)">
+                    {{ prioridadLabels[solicitud()!.prioridad!.nivel] }}
+                  </span>
+                }
+              </div>
+            </div>
+            <!-- Action buttons -->
+            <div class="action-buttons">
+              @if (canClasificar) {
+                <button (click)="openModal('clasificar')" class="btn-action btn-action--blue">
+                  Clasificar
+                </button>
+              }
+              @if (canAsignar) {
+                <button (click)="openModal('asignar')" class="btn-action btn-action--indigo">
+                  Asignar
+                </button>
+              }
+              @if (canAtender) {
+                <button (click)="openModal('atender')" class="btn-action btn-action--green">
+                  Marcar Atendida
+                </button>
+              }
+              @if (canCerrar) {
+                <button (click)="openModal('cerrar')" class="btn-action btn-action--gray">
+                  Cerrar
+                </button>
+              }
+              @if (canRechazar) {
+                <button (click)="openModal('rechazar')" class="btn-action btn-action--red">
+                  Rechazar
+                </button>
+              }
+            </div>
+          </div>
+
+          @if (error()) {
+            <div class="inline-error">{{ error() }}</div>
+          }
+
+          <div class="description-box">
+            <p class="description-label">Descripción</p>
+            <p class="description-text">{{ solicitud()!.descripcion }}</p>
+          </div>
+        </div>
+
+        <!-- Meta info card -->
+        <div class="card">
+          <h3 class="card-title">Información General</h3>
+          <div class="meta-grid">
+            <div class="meta-item">
+              <span class="meta-label">Canal de Origen</span>
+              <span class="meta-value">{{ canalLabels[solicitud()!.canal] }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Tipo de Solicitud</span>
+              <span class="meta-value">{{ solicitud()!.tipo?.nombre ?? '—' }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Fecha de Registro</span>
+              <span class="meta-value">{{ formatDateTime(solicitud()!.fechaRegistro) }}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Última Actualización</span>
+              <span class="meta-value">{{ formatDateTime(solicitud()!.fechaUltimaActualizacion) }}</span>
+            </div>
+            @if (solicitud()!.fechaLimite) {
+              <div class="meta-item">
+                <span class="meta-label">Fecha Límite</span>
+                <span class="meta-value">{{ formatDate(solicitud()!.fechaLimite!) }}</span>
+              </div>
+            }
+            @if (solicitud()!.prioridad) {
+              <div class="meta-item">
+                <span class="meta-label">Justificación Prioridad</span>
+                <span class="meta-value">{{ solicitud()!.prioridad!.justificacion }}</span>
+              </div>
+            }
+            @if (solicitud()!.observacionCierre) {
+              <div class="meta-item meta-item--full">
+                <span class="meta-label">Observación de Cierre</span>
+                <span class="meta-value">{{ solicitud()!.observacionCierre }}</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- AI suggestion -->
+        @if (solicitud()!.sugerenciaIA) {
+          <div class="card ia-card">
+            <div class="ia-card__header">
+              <div class="ia-badge">IA</div>
+              <h3>Sugerencia de Clasificación</h3>
+              <div class="ia-confidence">
+                Confianza: <strong>{{ confidencePercent(solicitud()!.sugerenciaIA!.confianza) }}</strong>
+              </div>
+            </div>
+            <div class="meta-grid">
+              <div class="meta-item">
+                <span class="meta-label">Tipo Sugerido</span>
+                <span class="meta-value">{{ solicitud()!.sugerenciaIA!.tipoSugerido.nombre }}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Prioridad Sugerida</span>
+                <span [class]="getPrioridadClass(solicitud()!.sugerenciaIA!.prioridadSugerida)">
+                  {{ prioridadLabels[solicitud()!.sugerenciaIA!.prioridadSugerida] }}
+                </span>
+              </div>
+              <div class="meta-item meta-item--full">
+                <span class="meta-label">Justificación IA</span>
+                <span class="meta-value">{{ solicitud()!.sugerenciaIA!.justificacionIA }}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Estado</span>
+                <span class="meta-value">
+                  @if (solicitud()!.sugerenciaIA!.confirmada) { ✅ Confirmada }
+                  @else if (solicitud()!.sugerenciaIA!.ajustada) { ✏️ Ajustada }
+                  @else { ⏳ Pendiente confirmación }
+                </span>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- RIGHT: People + Historial -->
+      <div class="side-col">
+        <!-- Solicitante + Responsable -->
+        <div class="card">
+          <h3 class="card-title">Personas</h3>
+          <div class="person-item">
+            <div class="person-avatar">{{ solicitud()!.solicitante.nombre[0] }}{{ solicitud()!.solicitante.apellido[0] }}</div>
+            <div class="person-info">
+              <span class="person-name">{{ solicitud()!.solicitante.nombre }} {{ solicitud()!.solicitante.apellido }}</span>
+              <span class="person-role">Solicitante · {{ solicitud()!.solicitante.identificacion }}</span>
+            </div>
+          </div>
+          @if (solicitud()!.responsableActual) {
+            <div class="person-divider"></div>
+            <div class="person-item">
+              <div class="person-avatar person-avatar--green">
+                {{ solicitud()!.responsableActual!.nombre[0] }}{{ solicitud()!.responsableActual!.apellido[0] }}
+              </div>
+              <div class="person-info">
+                <span class="person-name">{{ solicitud()!.responsableActual!.nombre }} {{ solicitud()!.responsableActual!.apellido }}</span>
+                <span class="person-role">Responsable actual</span>
+              </div>
+            </div>
+          } @else {
+            <div class="no-responsable">Sin responsable asignado</div>
+          }
+        </div>
+
+        <!-- Historial -->
+        @if (solicitud()!.contadorReaperturas > 0) {
+          <div class="card">
+            <h3 class="card-title">Reaperturas: {{ solicitud()!.contadorReaperturas }}</h3>
+          </div>
+        }
+      </div>
+    </div>
+  }
+</div>
+
+<!-- ─── MODALS ──────────────────────────────────────── -->
+@if (activeModal()) {
+  <div class="modal-backdrop" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <!-- CLASIFICAR -->
+      @if (activeModal() === 'clasificar') {
+        <h2 class="modal-title">Clasificar Solicitud</h2>
+        <p class="modal-hint">
+          @if (solicitud()?.sugerenciaIA) {
+            La IA sugiere: <strong>{{ solicitud()!.sugerenciaIA!.tipoSugerido.nombre }}</strong>
+            ({{ prioridadLabels[solicitud()!.sugerenciaIA!.prioridadSugerida] }} — {{ confidencePercent(solicitud()!.sugerenciaIA!.confianza) }} confianza)
+          }
+        </p>
+        <div class="modal-field">
+          <label>Tipo de Solicitud *</label>
+          <select [(ngModel)]="form.tipoSolicitudId">
+            <option [value]="0" disabled>Seleccionar tipo...</option>
+            @for (t of tipos(); track t.id) {
+              <option [value]="t.id">{{ t.nombre }}</option>
+            }
+          </select>
+        </div>
+        <div class="modal-field">
+          <label>Prioridad (opcional — se auto-calcula si vacío)</label>
+          <select [(ngModel)]="form.nivelPrioridad">
+            <option value="">Auto-calcular</option>
+            @for (p of prioridades; track p) {
+              <option [value]="p">{{ prioridadLabels[p] }}</option>
+            }
+          </select>
+        </div>
+        <div class="modal-field">
+          <label>Justificación (opcional)</label>
+          <textarea [(ngModel)]="form.justificacionPrioridad" rows="2" placeholder="Razón de la prioridad..."></textarea>
+        </div>
+        <div class="modal-actions">
+          <button (click)="closeModal()" class="btn-secondary">Cancelar</button>
+          <button (click)="submitClasificar()" class="btn-primary" [disabled]="!form.tipoSolicitudId || submitting()">
+            @if (submitting()) { Clasificando... } @else { Clasificar }
+          </button>
+        </div>
+      }
+
+      <!-- ASIGNAR -->
+      @if (activeModal() === 'asignar') {
+        <h2 class="modal-title">Asignar Responsable</h2>
+        <div class="modal-field">
+          <label>Responsable *</label>
+          <select [(ngModel)]="form.responsableId">
+            <option [value]="0" disabled>Seleccionar responsable...</option>
+            @for (u of usuarios(); track u.id) {
+              @if (u.activo) {
+                <option [value]="u.id">{{ u.nombre }} {{ u.apellido }} — {{ u.roles[0] }}</option>
+              }
+            }
+          </select>
+        </div>
+        <div class="modal-field">
+          <label>Notas (opcional)</label>
+          <textarea [(ngModel)]="form.notas" rows="2" placeholder="Instrucciones para el responsable..."></textarea>
+        </div>
+        <div class="modal-actions">
+          <button (click)="closeModal()" class="btn-secondary">Cancelar</button>
+          <button (click)="submitAsignar()" class="btn-primary" [disabled]="!form.responsableId || submitting()">
+            @if (submitting()) { Asignando... } @else { Asignar }
+          </button>
+        </div>
+      }
+
+      <!-- ATENDER -->
+      @if (activeModal() === 'atender') {
+        <h2 class="modal-title">Marcar como Atendida</h2>
+        <p class="modal-hint">Registra la resolución de esta solicitud (mínimo 20 caracteres).</p>
+        <div class="modal-field">
+          <label>Observación de resolución *</label>
+          <textarea [(ngModel)]="form.observacionResolucion" rows="4" placeholder="Describe cómo fue resuelta la solicitud..."></textarea>
+          <span class="char-count">{{ form.observacionResolucion.length }}/2000</span>
+        </div>
+        @if (error()) { <div class="inline-error">{{ error() }}</div> }
+        <div class="modal-actions">
+          <button (click)="closeModal()" class="btn-secondary">Cancelar</button>
+          <button (click)="submitAtender()" class="btn-primary btn-green" [disabled]="form.observacionResolucion.length < 20 || submitting()">
+            @if (submitting()) { Guardando... } @else { Marcar Atendida }
+          </button>
+        </div>
+      }
+
+      <!-- CERRAR -->
+      @if (activeModal() === 'cerrar') {
+        <h2 class="modal-title">Cerrar Solicitud</h2>
+        <p class="modal-hint">Esta acción es definitiva. La solicitud no podrá ser modificada.</p>
+        <div class="modal-field">
+          <label>Observación de cierre *</label>
+          <textarea [(ngModel)]="form.observacionCierre" rows="4" placeholder="Observación final del proceso..."></textarea>
+          <span class="char-count">{{ form.observacionCierre.length }}/1000</span>
+        </div>
+        @if (error()) { <div class="inline-error">{{ error() }}</div> }
+        <div class="modal-actions">
+          <button (click)="closeModal()" class="btn-secondary">Cancelar</button>
+          <button (click)="submitCerrar()" class="btn-primary btn-gray" [disabled]="form.observacionCierre.length < 20 || submitting()">
+            @if (submitting()) { Cerrando... } @else { Cerrar Solicitud }
+          </button>
+        </div>
+      }
+
+      <!-- RECHAZAR -->
+      @if (activeModal() === 'rechazar') {
+        <h2 class="modal-title">Rechazar Solicitud</h2>
+        <div class="modal-field">
+          <label>Motivo de rechazo *</label>
+          <select [(ngModel)]="form.motivo">
+            <option value="" disabled>Seleccionar motivo...</option>
+            @for (m of motivos; track m) {
+              <option [value]="m">{{ motivoLabels[m] }}</option>
+            }
+          </select>
+        </div>
+        <div class="modal-field">
+          <label>Justificación *</label>
+          <textarea [(ngModel)]="form.justificacionRechazo" rows="3" placeholder="Explica por qué se rechaza..."></textarea>
+          <span class="char-count">{{ form.justificacionRechazo.length }}/1000</span>
+        </div>
+        @if (error()) { <div class="inline-error">{{ error() }}</div> }
+        <div class="modal-actions">
+          <button (click)="closeModal()" class="btn-secondary">Cancelar</button>
+          <button (click)="submitRechazar()" class="btn-primary btn-red" [disabled]="!form.motivo || form.justificacionRechazo.length < 20 || submitting()">
+            @if (submitting()) { Rechazando... } @else { Rechazar }
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+}

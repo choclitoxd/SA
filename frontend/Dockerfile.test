@@ -1,0 +1,39 @@
+# Imagen para ejecutar los tests de Angular con Chrome headless
+FROM node:20-slim
+
+# Instalar Chromium y dependencias para modo headless
+RUN apt-get update && apt-get install -y \
+    chromium \
+    libglib2.0-0 \
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+# Wrapper que añade --no-sandbox automáticamente (requerido en Docker)
+RUN echo '#!/bin/sh\nexec /usr/bin/chromium --no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu "$@"' \
+    > /usr/local/bin/chromium-nosandbox \
+    && chmod +x /usr/local/bin/chromium-nosandbox
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+
+# Apuntar CHROME_BIN al wrapper con --no-sandbox
+ENV CHROME_BIN=/usr/local/bin/chromium-nosandbox
+
+# Salida: 0 = todos los tests pasan | 1 = algún test falla
+CMD ["npx", "ng", "test", "--watch=false", "--no-progress", "--browsers=ChromeHeadless"]

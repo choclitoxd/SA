@@ -1,0 +1,112 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Solicitudes Académicas</h1>
+      <p class="subtitle">
+        @if (!loading()) {
+          {{ totalElements() }} solicitud(es) en total
+        }
+      </p>
+    </div>
+    @if (canCreate) {
+      <a routerLink="/solicitudes/nueva" class="btn-primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+        </svg>
+        Nueva Solicitud
+      </a>
+    }
+  </div>
+
+  <div class="card">
+    @if (loading()) {
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Cargando solicitudes...</p>
+      </div>
+    } @else if (solicitudes().length === 0) {
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0H4"/>
+        </svg>
+        <p>No hay solicitudes para mostrar.</p>
+        @if (canCreate) {
+          <a routerLink="/solicitudes/nueva" class="btn-primary btn-sm">Crear primera solicitud</a>
+        }
+      </div>
+    } @else {
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Tipo</th>
+              <th>Estado</th>
+              <th>Prioridad</th>
+              <th>Solicitante</th>
+              <th>Responsable</th>
+              <th>Fecha Registro</th>
+              <th>Fecha Límite</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (s of solicitudes(); track s.id) {
+              <tr [class.row--vencida]="s.vencida">
+                <td>
+                  <div class="code-cell">
+                    <span class="code">{{ s.codigo }}</span>
+                    @if (s.vencida) { <span class="tag-vencida">VEN</span> }
+                  </div>
+                </td>
+                <td class="truncate">{{ s.tipoNombre ?? '—' }}</td>
+                <td><span [class]="getEstadoClass(s.estado)">{{ estadoLabels[s.estado] }}</span></td>
+                <td>
+                  @if (s.prioridad) {
+                    <span [class]="getPrioridadClass(s.prioridad)">{{ prioridadLabels[s.prioridad] }}</span>
+                  } @else { <span class="text-muted">—</span> }
+                </td>
+                <td>{{ s.solicitanteNombre }}</td>
+                <td>{{ s.responsableNombre ?? '—' }}</td>
+                <td class="date-cell">{{ formatDate(s.fechaRegistro) }}</td>
+                <td class="date-cell">{{ s.fechaLimite ? formatDate(s.fechaLimite) : '—' }}</td>
+                <td>
+                  <a [routerLink]="['/solicitudes', s.id]" class="btn-icon" title="Ver detalle">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                  </a>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      @if (totalPages() > 1) {
+        <div class="pagination">
+          <button (click)="goToPage(currentPage() - 1)" [disabled]="currentPage() === 0" class="page-btn">
+            ← Anterior
+          </button>
+          @for (p of pages; track p) {
+            @if (p < 5 || p === totalPages() - 1 || Math.abs(p - currentPage()) <= 1) {
+              <button
+                (click)="goToPage(p)"
+                [class.active]="p === currentPage()"
+                class="page-btn page-btn--num"
+              >{{ p + 1 }}</button>
+            }
+          }
+          <button (click)="goToPage(currentPage() + 1)" [disabled]="currentPage() === totalPages() - 1" class="page-btn">
+            Siguiente →
+          </button>
+          <span class="pagination-info">
+            Página {{ currentPage() + 1 }} de {{ totalPages() }}
+          </span>
+        </div>
+      }
+    }
+  </div>
+</div>

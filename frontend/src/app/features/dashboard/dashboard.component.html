@@ -1,0 +1,101 @@
+<div class="dashboard">
+  <div class="page-header">
+    <div>
+      <h1 class="greeting">{{ greeting }}</h1>
+      <p class="subtitle">Aquí tienes el resumen del sistema de solicitudes.</p>
+    </div>
+    <a routerLink="/solicitudes/nueva" class="btn-primary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="16"/>
+        <line x1="8" y1="12" x2="16" y2="12"/>
+      </svg>
+      Nueva Solicitud
+    </a>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state">
+      <div class="spinner-lg"></div>
+      <p>Cargando datos...</p>
+    </div>
+  } @else {
+    <!-- Stats -->
+    <div class="stats-grid">
+      @for (stat of stats(); track stat.label) {
+        <div class="stat-card stat-card--{{ stat.color }}">
+          <div class="stat-card__icon" [innerHTML]="getStatIcon(stat.icon)"></div>
+          <div class="stat-card__body">
+            <span class="stat-card__value">{{ stat.value }}</span>
+            <span class="stat-card__label">{{ stat.label }}</span>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Recent requests -->
+    <div class="section">
+      <div class="section-header">
+        <h2>Solicitudes Recientes</h2>
+        <a routerLink="/solicitudes" class="btn-link">Ver todas →</a>
+      </div>
+
+      @if (recientes().length === 0) {
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0H4"/>
+          </svg>
+          <p>No hay solicitudes registradas aún.</p>
+          <a routerLink="/solicitudes/nueva" class="btn-primary btn-sm">Crear primera solicitud</a>
+        </div>
+      } @else {
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Tipo</th>
+                <th>Estado</th>
+                <th>Prioridad</th>
+                <th>Solicitante</th>
+                <th>Fecha</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (s of recientes(); track s.id) {
+                <tr [class.row--vencida]="s.vencida">
+                  <td class="code-cell">
+                    <span class="code">{{ s.codigo }}</span>
+                    @if (s.vencida) {
+                      <span class="vencida-tag">VENCIDA</span>
+                    }
+                  </td>
+                  <td class="tipo-cell">{{ s.tipoNombre ?? '—' }}</td>
+                  <td><span [class]="getEstadoClass(s.estado)">{{ estadoLabels[s.estado] }}</span></td>
+                  <td>
+                    @if (s.prioridad) {
+                      <span [class]="getPrioridadClass(s.prioridad)">{{ prioridadLabels[s.prioridad] }}</span>
+                    } @else {
+                      <span class="text-muted">—</span>
+                    }
+                  </td>
+                  <td>{{ s.solicitanteNombre }}</td>
+                  <td class="date-cell">{{ formatDate(s.fechaRegistro) }}</td>
+                  <td>
+                    <a [routerLink]="['/solicitudes', s.id]" class="btn-icon" title="Ver detalle">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>
+                    </a>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+</div>
