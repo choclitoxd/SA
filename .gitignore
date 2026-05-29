@@ -26,6 +26,7 @@ Thumbs.db
 *.p12
 *.pem
 *.jks
+backend/env
 
 # Project specific
 AGENTS.md
