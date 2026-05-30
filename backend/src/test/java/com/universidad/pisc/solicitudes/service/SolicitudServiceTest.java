@@ -12,6 +12,7 @@ import com.universidad.pisc.solicitudes.model.*;
 import com.universidad.pisc.solicitudes.repository.AsignacionRepository;
 import com.universidad.pisc.solicitudes.repository.SolicitudAcademicaRepository;
 import com.universidad.pisc.solicitudes.repository.SugerenciaIARepository;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,6 +46,8 @@ class SolicitudServiceTest {
     private SugerenciaIARepository sugerenciaIARepository;
     @Mock
     private SolicitudMapper mapper;
+    @Mock
+    private EntityManager entityManager;
 
     @InjectMocks
     private SolicitudService solicitudService;
@@ -55,6 +58,8 @@ class SolicitudServiceTest {
 
     @BeforeEach
     void setUp() {
+        doNothing().when(entityManager).flush();
+        doNothing().when(entityManager).refresh(any());
         solicitante = new Usuario();
         solicitante.setId(1L);
         solicitante.setIdentificacion("12345678");

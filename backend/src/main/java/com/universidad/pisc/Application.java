@@ -10,6 +10,7 @@ public class Application {
 	public static void main(String[] args) {
 		// Cargar variables de entorno desde el archivo .env
 		Dotenv dotenv = Dotenv.configure()
+				.filename("env")
 				.ignoreIfMissing()
 				.load();
 

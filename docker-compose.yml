@@ -20,7 +20,7 @@ services:
       - 8.8.4.4
     networks:
       - pisc-network
-    restart: unless-stopped
+    restart: "no"
 
   frontend:
     build:

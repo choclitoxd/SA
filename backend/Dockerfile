@@ -23,4 +23,4 @@ COPY --from=build /app/target/solicitudes-academicas-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8080
 
 # Ejecutar con configuraciones de memoria optimizadas para contenedores
-ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-Djdk.tls.client.protocols=TLSv1.2", "-Dhttps.protocols=TLSv1.2", "-jar", "app.jar"]
