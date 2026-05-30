@@ -22,6 +22,9 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
+                // Endpoint de perfil propio (cualquier usuario autenticado)
+                .requestMatchers("/auth/me").authenticated()
+
                 // Endpoints de Gestión de Usuarios (ADMINISTRATIVO o DIRECTOR)
                 .requestMatchers("/usuarios/**").hasAnyRole("ADMINISTRATIVO", "DIRECTOR")
                 

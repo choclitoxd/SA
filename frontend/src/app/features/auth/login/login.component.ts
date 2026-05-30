@@ -36,47 +36,18 @@ export class LoginComponent {
     const credentials = btoa(`${this.email}:${this.password}`);
     const headers = { Authorization: `Basic ${credentials}` };
 
-    // Try to hit /solicitudes (accessible by any authenticated user)
+    // Usa /auth/me — accesible por cualquier rol autenticado
     this.http
-      .get<any>('/solicitudes', { headers, params: { page: 0, size: 1 } })
+      .get<any>('/auth/me', { headers })
       .subscribe({
-        next: () => {
-          // Now fetch the user from /usuarios filtered by email
-          // Since there's no /me endpoint, we try /usuarios and search by email
-          this.http
-            .get<any>('/usuarios', { headers, params: { page: 0, size: 100 } })
-            .subscribe({
-              next: (resp) => {
-                const users = resp.content ?? [];
-                const me = users.find((u: any) => u.email === this.email);
-                if (me) {
-                  this.auth.setUser(this.email, this.password, {
-                    nombre: me.nombre,
-                    apellido: me.apellido,
-                    roles: me.roles,
-                  });
-                } else {
-                  // User is authenticated but not in ADMINISTRATIVO/DIRECTOR list
-                  // Means they're ESTUDIANTE/DOCENTE — set minimal info
-                  this.auth.setUser(this.email, this.password, {
-                    nombre: this.email.split('@')[0],
-                    apellido: '',
-                    roles: [NombreRol.ESTUDIANTE],
-                  });
-                }
-                this.router.navigate(['/dashboard']);
-              },
-              error: () => {
-                // /usuarios returned 403 — user doesn't have admin access
-                // Still let them in with minimal info
-                this.auth.setUser(this.email, this.password, {
-                  nombre: this.email.split('@')[0],
-                  apellido: '',
-                  roles: [NombreRol.ESTUDIANTE],
-                });
-                this.router.navigate(['/dashboard']);
-              },
-            });
+        next: (me) => {
+          this.auth.setUser(this.email, this.password, {
+            nombre: me.nombre,
+            apellido: me.apellido,
+            roles: me.roles,
+          });
+          this.loading.set(false);
+          this.router.navigate(['/dashboard']);
         },
         error: (err) => {
           this.loading.set(false);

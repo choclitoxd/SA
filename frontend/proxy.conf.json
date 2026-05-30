@@ -1,4 +1,10 @@
 {
+  "/auth": {
+    "target": "http://localhost:8080",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "info"
+  },
   "/solicitudes": {
     "target": "http://localhost:8080",
     "secure": false,

@@ -249,7 +249,7 @@
           <select [(ngModel)]="form.responsableId">
             <option [value]="0" disabled>Seleccionar responsable...</option>
             @for (u of usuarios(); track u.id) {
-              @if (u.activo) {
+              @if (u.activo && !u.roles.includes(NombreRol.ESTUDIANTE)) {
                 <option [value]="u.id">{{ u.nombre }} {{ u.apellido }} — {{ u.roles[0] }}</option>
               }
             }
